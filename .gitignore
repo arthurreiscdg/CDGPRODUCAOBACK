@@ -1,0 +1,60 @@
+# Ambientes virtuais
+venv/
+env/
+ENV/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+
+# Logs
+*.log
+
+# Banco de dados local
+*.sqlite3
+
+# Arquivos de configuração locais
+*.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# Arquivos do editor
+.vscode/
+.idea/
+
+# Arquivos do sistema operacional
+*.swp
+*~
+*.bak
+
+# Migrations (opcional: só ignore se você não quiser versionar elas inicialmente)
+# */migrations/
+# !*/migrations/__init__.py
+
+# Arquivos gerados por coletar arquivos estáticos
+staticfiles/
+static/
+media/
+
+# Arquivos de testes
+coverage/
+htmlcov/
+.tox/
+.pytest_cache/
+
+# Django stuff:
+*.mo
+*.pot
+
+# Node/NPM (se usar frontend integrado)
+node_modules/
+
+# Build
+dist/
+build/
