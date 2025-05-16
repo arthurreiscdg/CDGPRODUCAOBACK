@@ -4,3 +4,4 @@ from .webhook import (
     WebhookEndpointConfigSerializer,
     WebhookStatusEnviadoSerializer
 )
+from .pedido import PedidoSerializer

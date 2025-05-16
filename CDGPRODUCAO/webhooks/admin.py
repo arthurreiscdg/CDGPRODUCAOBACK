@@ -3,7 +3,8 @@ from .models import (
     WebhookConfig, 
     Webhook, 
     WebhookEndpointConfig,
-    WebhookStatusEnviado
+    WebhookStatusEnviado,
+    Pedido
 )
 
 @admin.register(WebhookConfig)
@@ -29,6 +30,17 @@ class WebhookEndpointConfigAdmin(admin.ModelAdmin):
 
 @admin.register(WebhookStatusEnviado)
 class WebhookStatusEnviadoAdmin(admin.ModelAdmin):
+    list_display = ('pedido_id', 'status', 'url_destino', 'sucesso', 'codigo_http', 'enviado_em', 'tentativa_numero')
+    list_filter = ('sucesso', 'status')
+    search_fields = ('pedido_id', 'url_destino', 'payload')
+    readonly_fields = ('enviado_em',)
+
+@admin.register(Pedido)
+class PedidoAdmin(admin.ModelAdmin):
+    list_display = ('numero_pedido', 'nome_cliente', 'email_cliente', 'valor_pedido', 'status', 'criado_em')
+    list_filter = ('status', 'criado_em')
+    search_fields = ('numero_pedido', 'nome_cliente', 'email_cliente', 'documento_cliente')
+    readonly_fields = ('criado_em', 'atualizado_em', 'webhook_id')
     list_display = ('pedido_id', 'status', 'url_destino', 'sucesso', 'codigo_http', 'enviado_em', 'tentativa_numero')
     list_filter = ('sucesso', 'status')
     search_fields = ('pedido_id', 'url_destino', 'payload')

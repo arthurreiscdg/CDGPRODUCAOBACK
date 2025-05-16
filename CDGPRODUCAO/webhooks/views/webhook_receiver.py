@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 
 from webhooks.services import WebhookProcessor
+from webhooks.models import Pedido
 from webhooks.serializers import WebhookSerializer
 
 logger = logging.getLogger(__name__)
@@ -18,8 +19,7 @@ class WebhookReceiverView(APIView):
     e processa o webhook recebido.
     """
     permission_classes = [AllowAny]  # Permite requisições sem autenticação
-    
-    def post(self, request, *args, **kwargs):
+      def post(self, request, *args, **kwargs):
         try:
             # Extrai as informações da requisição
             payload = request.body.decode('utf-8')
@@ -33,16 +33,28 @@ class WebhookReceiverView(APIView):
                 signature=signature
             )
             
+            # Se o webhook for um pedido, cria um novo registro de pedido
+            pedido = None
+            if event_type == 'novo_pedido' or event_type == 'pedido_atualizado':
+                try:
+                    pedido = Pedido.criar_do_webhook(webhook)
+                    logger.info(f"Pedido #{pedido.numero_pedido} criado/atualizado com sucesso a partir do webhook")
+                except Exception as e:
+                    logger.error(f"Erro ao criar pedido a partir do webhook: {str(e)}")
+            
             # Retorna a resposta
             serializer = WebhookSerializer(webhook)
-            return Response(
-                {
-                    'status': 'success',
-                    'message': 'Webhook recebido com sucesso',
-                    'webhook': serializer.data
-                },
-                status=status.HTTP_200_OK
-            )
+            response_data = {
+                'status': 'success',
+                'message': 'Webhook recebido com sucesso',
+                'webhook': serializer.data
+            }
+            
+            if pedido:
+                response_data['pedido_criado'] = True
+                response_data['numero_pedido'] = pedido.numero_pedido
+            
+            return Response(response_data, status=status.HTTP_200_OK)
             
         except json.JSONDecodeError:
             logger.error("Payload inválido: não é um JSON válido")
