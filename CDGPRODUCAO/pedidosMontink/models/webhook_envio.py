@@ -1,4 +1,5 @@
 from django.db import models
+from .webhook_pedido import Pedido
 
 
 class WebhookStatusEnviado(models.Model):

@@ -9,8 +9,8 @@ import argparse
 def main():
     # Processar argumentos da linha de comando
     parser = argparse.ArgumentParser(description='Envia webhooks de teste com assinatura')
-    parser.add_argument('--url', default='http://127.0.0.1:8000/api/webhooks/receive/', help='URL para enviar os webhooks')
-    parser.add_argument('--secret', default='54gtyt57rbgh5f4x35g186vf73h157', help='Chave secreta para assinar os webhooks')
+    parser.add_argument('--url', default='http://127.0.0.1:8000/api/webhooks/receber/', help='URL para enviar os webhooks')
+    parser.add_argument('--secret', default='sua-chave-secreta-aqui', help='Chave secreta para assinar os webhooks')
     parser.add_argument('--count', type=int, default=3, help='Número de webhooks para enviar')
     parser.add_argument('--invalid-signature', action='store_true', help='Envia um webhook com assinatura inválida para testar rejeição')
     args = parser.parse_args()
@@ -89,10 +89,10 @@ def main():
             hashlib.sha256
         ).hexdigest()
 
-        # Configura os cabeçalhos com a assinatura
+    # Configura os cabeçalhos com a assinatura
         headers = {
             "Content-Type": "application/json",
-            "X-Hub-Signature": f"sha256={signature}",
+            "X-Webhook-Signature": signature,
             "X-Webhook-Event": "novo_pedido"
         }
 
