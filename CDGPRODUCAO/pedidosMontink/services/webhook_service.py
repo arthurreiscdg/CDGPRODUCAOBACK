@@ -11,7 +11,6 @@ class WebhookService:
     Serviço de gerenciamento de webhooks.
     Implementa a lógica de verificação de assinatura, processamento e envio de webhooks.
     """
-
     @staticmethod
     def verificar_assinatura(payload, assinatura, secret_key=None):
         """
@@ -24,8 +23,10 @@ class WebhookService:
                                        usa a chave configurada nas configurações.
                                        
         Returns:
-            bool: True se a assinatura for válida, False caso contrário
+            tuple: (bool, WebhookConfig) - True se a assinatura for válida, False caso contrário,
+                                          e a configuração de webhook utilizada (se existir)
         """
+        webhook_config = None
         if not secret_key:
             try:
                 webhook_config = WebhookConfig.objects.filter(ativo=True).first()
@@ -38,18 +39,17 @@ class WebhookService:
                 secret_key = settings.WEBHOOK_SECRET_KEY
         
         if not secret_key or not assinatura:
-            return False
+            return False, webhook_config
         
         # Calcula o hash HMAC-SHA256 do payload
         calculado = hmac.new(
             secret_key.encode('utf-8'),
             payload.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
+            hashlib.sha256        ).hexdigest()
         
         # Compara com a assinatura fornecida
-        return hmac.compare_digest(calculado, assinatura)
-
+        return hmac.compare_digest(calculado, assinatura), webhook_config
+        
     @classmethod
     def processar_webhook(cls, payload, assinatura=None, evento='pedido'):
         """
@@ -73,8 +73,9 @@ class WebhookService:
         
         # Verifica a assinatura se fornecida
         verificado = False
+        webhook_config = None
         if assinatura:
-            verificado = cls.verificar_assinatura(payload, assinatura)
+            verificado, webhook_config = cls.verificar_assinatura(payload, assinatura)
             webhook.verificado = verificado
             webhook.save(update_fields=['verificado'])
         
@@ -85,7 +86,6 @@ class WebhookService:
             pedido = cls.criar_pedido_de_webhook(data, webhook)
         
         return webhook, pedido, verificado
-    
     @staticmethod
     def criar_pedido_de_webhook(data, webhook):
         """
@@ -108,7 +108,7 @@ class WebhookService:
         )
         
         # Coleta dados do primeiro produto (modelo atual suporta apenas um produto por pedido)
-        produto = data['produtos'][0] if data.get('produtos') else {}
+        produto = data.get('produtos', [])[0] if data.get('produtos') else {}
         
         # Cria o pedido
         pedido = Pedido.objects.create(
