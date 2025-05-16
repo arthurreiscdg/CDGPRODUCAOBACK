@@ -18,8 +18,9 @@ class WebhookReceiverView(APIView):
     Esta view aceita POSTs com payloads de webhook, verifica a assinatura
     e processa o webhook recebido.
     """
+    
     permission_classes = [AllowAny]  # Permite requisições sem autenticação
-      def post(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         try:
             # Extrai as informações da requisição
             payload = request.body.decode('utf-8')

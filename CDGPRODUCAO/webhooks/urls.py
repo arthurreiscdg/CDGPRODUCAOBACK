@@ -7,7 +7,7 @@ from webhooks.views import (
     PedidoViewSet
 )
 
-# Configurar o router para o ViewSet de pedidos
+# Configurar o router para PedidoViewSet
 router = DefaultRouter()
 router.register(r'pedidos', PedidoViewSet)
 
