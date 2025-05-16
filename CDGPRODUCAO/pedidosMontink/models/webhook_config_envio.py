@@ -1,5 +1,4 @@
 from django.db import models
-import json
 
 class WebhookEndpointConfig(models.Model):
     """
@@ -29,39 +28,6 @@ class WebhookEndpointConfig(models.Model):
     
     def __str__(self):
         return f"{self.nome} - {'Ativo' if self.ativo else 'Inativo'}"
-    
-    def get_headers(self):
-        """
-        Retorna os cabeçalhos para a requisição HTTP, incluindo cabeçalhos adicionais
-        definidos em formato JSON.
-        """
-        headers = {
-            'Content-Type': 'application/json',
-        }
-        
-        # Adiciona token de autenticação se disponível
-        if self.token_autenticacao:
-            headers['Authorization'] = f'Bearer {self.token_autenticacao}'
-        
-        # Adiciona cabeçalhos personalizados se disponíveis
-        if self.headers_adicionais:
-            try:
-                custom_headers = json.loads(self.headers_adicionais)
-                headers.update(custom_headers)
-            except json.JSONDecodeError:
-                pass  # Ignora se o JSON for inválido
-                
-        return headers
-    
-    def get_url_with_token(self):
-        """
-        Retorna a URL com o token de acesso anexado, se disponível.
-        """
-        if not self.access_token:
-            return self.url
-            
-        separator = '&' if '?' in self.url else '?'
-        return f"{self.url}{separator}access_token={self.access_token}"
     
     class Meta:
         verbose_name = "Configuração de Endpoint de Webhook"
