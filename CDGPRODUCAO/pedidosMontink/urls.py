@@ -1,7 +1,6 @@
 from django.urls import path
-from .views import WebhookReceiverView, WebhookStatusView
+from .views.webhook_receber import WebhookReceberView
 
 urlpatterns = [
-    path('receber/', WebhookReceiverView.as_view(), name='webhook-receiver'),
-    path('status/<int:pedido_id>/', WebhookStatusView.as_view(), name='status-change'),
+    path('receber/', WebhookReceberView.as_view(), name='webhook-receiver'),
 ]
