@@ -1,4 +1,5 @@
 from django.db import models
+
 class Formulario(models.Model):
     # Campos de Contato
     nome = models.CharField(max_length=100, null=True, blank=True)
