@@ -1,7 +1,5 @@
-from .webhook_receber import WebhookReceiverView
-from .webhook_enviar import WebhookStatusView
+from .webhook_receber import WebhookReceberView
 
 __all__ = [
-    'WebhookReceiverView',
-    'WebhookStatusView',
+    'WebhookReceberView',
 ]

@@ -1,4 +1,5 @@
 from django.db import models
+from .webhook_pedido import Pedido
 
 class WebhookEndpointConfig(models.Model):
     """
@@ -52,8 +53,13 @@ class Webhook(models.Model):
     assinatura = models.CharField(max_length=255, null=True)
     verificado = models.BooleanField(default=False)
     recebido_em = models.DateTimeField(auto_now_add=True)
+    status_code = models.IntegerField(null=True, blank=True, help_text="Código de status HTTP do processamento")
+    erro = models.TextField(null=True, blank=True, help_text="Mensagem de erro, se houver")
+    processado = models.BooleanField(default=False, help_text="Indica se o webhook foi processado com sucesso")
 
     def __str__(self):
+        if self.status_code:
+            return f"Webhook - {self.evento} - Status: {self.status_code} {'(Verificado)' if self.verificado else '(Não Verificado)'}"
         return f"Webhook - {self.evento} {'(Verificado)' if self.verificado else '(Não Verificado)'}"
 
 

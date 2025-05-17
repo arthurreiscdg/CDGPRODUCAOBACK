@@ -71,8 +71,7 @@ class WebhookService:
                 assinatura_verificada = WebhookService.verificar_assinatura(
                     payload_raw, assinatura_recebida, config.secret_key
                 )
-            
-            # Salvar o webhook recebido
+              # Salvar o webhook recebido
             webhook = Webhook.objects.create(
                 evento=evento,
                 payload=payload_str,
@@ -82,6 +81,11 @@ class WebhookService:
             
             # Se a assinatura foi fornecida mas é inválida, retornar erro
             if assinatura_recebida and not assinatura_verificada:
+                # Atualizar o webhook com informações de erro
+                webhook.status_code = 401  # Unauthorized
+                webhook.erro = "Assinatura inválida"
+                webhook.processado = False
+                webhook.save()
                 return False, "Assinatura inválida", None
             
             # Processar os dados do pedido
@@ -187,12 +191,36 @@ class WebhookService:
                         mockup_capa_costas=mockups.get('capa_costas')
                     )
                     pedido.save()
+                      # Atualizar o webhook com informações de sucesso
+                    webhook.status_code = 201  # Created
+                    webhook.processado = True
+                    webhook.save()
                     
                     return True, f"Pedido #{numero_pedido} recebido com sucesso", pedido.id
                 
                 except Exception as e:
                     # Rollback é automático devido ao uso de transaction.atomic()
-                    return False, f"Erro ao salvar o pedido: {str(e)}", None
+                    erro_msg = f"Erro ao salvar o pedido: {str(e)}"
+                    
+                    # Atualizar o webhook com informações de erro
+                    webhook.status_code = 500  # Internal Server Error
+                    webhook.erro = erro_msg
+                    webhook.processado = False
+                    webhook.save()
+                    
+                    return False, erro_msg, None
         
         except Exception as e:
-            return False, f"Erro ao processar webhook: {str(e)}", None
+            erro_msg = f"Erro ao processar webhook: {str(e)}"
+            
+            # Se o webhook já foi criado, atualizá-lo com informações de erro
+            try:
+                if 'webhook' in locals():
+                    webhook.status_code = 500  # Internal Server Error
+                    webhook.erro = erro_msg
+                    webhook.processado = False
+                    webhook.save()
+            except:
+                pass  # Se não conseguir atualizar o webhook, apenas continue
+                
+            return False, erro_msg, None
