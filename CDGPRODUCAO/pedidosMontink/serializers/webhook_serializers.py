@@ -39,19 +39,81 @@ class WebhookPedidoResponseSerializer(serializers.Serializer):
     pedido_id = serializers.IntegerField(allow_null=True)
     
     
+class DesignsSerializer(serializers.Serializer):
+    """
+    Serializer para validar o objeto designs dentro de produtos
+    """
+    capa_frente = serializers.URLField(required=True)
+    capa_verso = serializers.URLField(required=False, allow_null=True)
+
+
+class MockupsSerializer(serializers.Serializer):
+    """
+    Serializer para validar o objeto mockups dentro de produtos
+    """
+    capa_frente = serializers.URLField(required=True)
+    capa_costas = serializers.URLField(required=False, allow_null=True)
+
+
+class ProdutoSerializer(serializers.Serializer):
+    """
+    Serializer para validar os produtos recebidos por webhook
+    """
+    nome = serializers.CharField(required=True)
+    sku = serializers.CharField(required=True)
+    quantidade = serializers.IntegerField(required=True, min_value=1)
+    id_sku = serializers.IntegerField(required=False, allow_null=True)
+    designs = DesignsSerializer(required=True)
+    mockups = MockupsSerializer(required=True)
+    arquivo_pdf = serializers.URLField(required=False, allow_null=True)
+
+
+class InformacoesAdicionaisSerializer(serializers.Serializer):
+    """
+    Serializer para validar o objeto informacoes_adicionais
+    """
+    nome = serializers.CharField(required=True)
+    telefone = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
+
+
+class EnderecoEnvioSerializer(serializers.Serializer):
+    """
+    Serializer para validar o objeto endereco_envio
+    """
+    nome_destinatario = serializers.CharField(required=True)
+    endereco = serializers.CharField(required=True)
+    numero = serializers.CharField(required=True)
+    complemento = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    cidade = serializers.CharField(required=True)
+    uf = serializers.CharField(required=True, max_length=2)
+    cep = serializers.CharField(required=True)
+    bairro = serializers.CharField(required=True)
+    telefone = serializers.CharField(required=True)
+    pais = serializers.CharField(required=False, default="Brasil")
+
+
 class WebhookPedidoRequestSerializer(serializers.Serializer):
     """
-    Serializer para validar os dados mínimos de um pedido recebido por webhook
+    Serializer para validar os dados do novo modelo de JSON recebido por webhook
     """
-    evento = serializers.CharField(default="pedido.novo")
-    pedido = serializers.DictField()
+    evento = serializers.CharField(required=False, default="pedido.novo")
+    valor_pedido = serializers.DecimalField(required=True, max_digits=10, decimal_places=2)
+    custo_envio = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, allow_null=True)
+    etiqueta_envio = serializers.URLField(required=False, allow_null=True)
+    metodo_envio = serializers.IntegerField(required=False, allow_null=True)
+    numero_pedido = serializers.IntegerField(required=True)
+    nome_cliente = serializers.CharField(required=True)
+    documento_cliente = serializers.CharField(required=True)
+    email_cliente = serializers.EmailField(required=True)
+    produtos = serializers.ListField(
+        child=ProdutoSerializer(),
+        required=True,
+        min_length=1
+    )
+    informacoes_adicionais = InformacoesAdicionaisSerializer(required=True)
+    endereco_envio = EnderecoEnvioSerializer(required=True)
     
-    def validate_pedido(self, pedido):
-        # Verifica se os campos obrigatórios estão presentes
-        campos_obrigatorios = ['numero_pedido', 'nome_cliente', 'email_cliente']
-        
-        for campo in campos_obrigatorios:
-            if campo not in pedido:
-                raise serializers.ValidationError(f"Campo obrigatório '{campo}' não fornecido")
-        
-        return pedido
+    def validate(self, data):
+        # Validações adicionais podem ser adicionadas aqui
+        return data

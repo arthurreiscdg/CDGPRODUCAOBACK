@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+import json
 from pedidosMontink.services.webhook_service import WebhookService
 from pedidosMontink.serializers.webhook_serializers import (
     WebhookPedidoRequestSerializer, 
@@ -19,8 +20,7 @@ class WebhookReceberView(APIView):
     verifica se a assinatura é válida usando a secret_key configurada, 
     e salva o pedido na base de dados.
     """
-    
-    def post(self, request, *args, **kwargs):
+      def post(self, request, *args, **kwargs):
         """
         Recebe um webhook com dados de pedido.
         
@@ -32,6 +32,26 @@ class WebhookReceberView(APIView):
         
         # Manter o payload bruto para verificação da assinatura
         payload_raw = request.body
+        
+        # Validar o formato do JSON recebido
+        try:
+            dados = json.loads(payload_raw.decode('utf-8'))
+            serializer = WebhookPedidoRequestSerializer(data=dados)
+            
+            if not serializer.is_valid():
+                return Response({
+                    'sucesso': False,
+                    'mensagem': 'Formato de dados inválido',
+                    'erros': serializer.errors,
+                    'pedido_id': None
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except json.JSONDecodeError:
+            return Response({
+                'sucesso': False,
+                'mensagem': 'Payload inválido: não é um JSON válido',
+                'pedido_id': None
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Processar o webhook
         sucesso, mensagem, pedido_id = WebhookService.processar_webhook_pedido(
