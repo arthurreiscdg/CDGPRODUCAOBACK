@@ -21,4 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/webhooks/', include('pedidosMontink.urls')),
     path('api/formularios/', include('formsProducao.urls')),
+    path('api/auth/', include('usuarios.urls')),
 ]
