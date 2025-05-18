@@ -1,5 +1,8 @@
 
 
+from rest_framework import serializers
+from formsProducao.serializers.form_serializers import FormularioBaseSerializer
+
 class EliteSerializer(FormularioBaseSerializer):
     """
     Serializer específico para o formulário Elite.

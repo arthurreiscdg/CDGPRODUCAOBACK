@@ -1,10 +1,9 @@
-# filepath: c:\Users\Arthur Reis\Documents\PROJETOCASADAGRAFICA\CDGPRODUCAOBACK\CDGPRODUCAO\formsProducao\views\elite.py
 import logging
 from rest_framework.permissions import IsAuthenticated
 
 from formsProducao.views.base_view import BaseFormularioView
-from formsProducao.serializers.form_serializers import EliteSerializer
-from formsProducao.services.form_services import EliteService
+from formsProducao.serializers import EliteSerializer
+from formsProducao.services import EliteService
 
 logger = logging.getLogger(__name__)
 

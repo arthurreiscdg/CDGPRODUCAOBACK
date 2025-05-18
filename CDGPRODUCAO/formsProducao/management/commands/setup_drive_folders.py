@@ -2,7 +2,7 @@ import os
 import logging
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from formsProducao.services.form_services import (
+from formsProducao.services import (
     ZeroHumService, PensiService, EliteService, coleguiumService
 )
 

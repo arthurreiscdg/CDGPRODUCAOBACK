@@ -2,10 +2,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from formsProducao.views.zerohum import ZeroHumView
-from formsProducao.views.pensi import PensiView
-from formsProducao.views.elite import EliteView
-from formsProducao.views.coleguium import coleguiumView
+from formsProducao.views import ZeroHumView, PensiView, EliteView, ColeguiumView
 
 urlpatterns = [
     # Rotas para o formulário ZeroHum
@@ -19,8 +16,7 @@ urlpatterns = [
     # Rotas para o formulário Elite
     path('elite/', EliteView.as_view(), name='elite-formulario'),
     path('elite/<str:cod_op>/', EliteView.as_view(), name='elite-detalhe'),
-    
-    # Rotas para o formulário coleguium
-    path('coleguium/', coleguiumView.as_view(), name='coleguium-formulario'),
-    path('coleguium/<str:cod_op>/', coleguiumView.as_view(), name='coleguium-detalhe'),
+      # Rotas para o formulário Coleguium
+    path('coleguium/', ColeguiumView.as_view(), name='coleguium-formulario'),
+    path('coleguium/<str:cod_op>/', ColeguiumView.as_view(), name='coleguium-detalhe'),
 ]

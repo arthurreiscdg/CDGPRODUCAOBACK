@@ -1,4 +1,6 @@
-
+# filepath: c:\Users\Arthur Reis\Documents\PROJETOCASADAGRAFICA\CDGPRODUCAOBACK\CDGPRODUCAO\formsProducao\serializers\coleguium_serializers.py
+from rest_framework import serializers
+from formsProducao.serializers.form_serializers import FormularioBaseSerializer
 
 class coleguiumSerializer(FormularioBaseSerializer):
     """

@@ -2,18 +2,18 @@ import logging
 from rest_framework.permissions import IsAuthenticated
 
 from formsProducao.views.base_view import BaseFormularioView
-from formsProducao.serializers import ZeroHumSerializer
-from formsProducao.services import ZeroHumService
+from formsProducao.serializers import coleguiumSerializer
+from formsProducao.services import coleguiumService
 
 logger = logging.getLogger(__name__)
 
-class ZeroHumView(BaseFormularioView):
+class ColeguiumView(BaseFormularioView):
     """
-    View para gerenciar o formulário ZeroHum.
+    View para gerenciar o formulário Coleguium.
     Herda funcionalidades da BaseFormularioView.
     """
-    serializer_class = ZeroHumSerializer
-    service_class = ZeroHumService
+    serializer_class = coleguiumSerializer
+    service_class = coleguiumService
     
     # Descomente a linha abaixo se quiser exigir autenticação
     # permission_classes = [IsAuthenticated]

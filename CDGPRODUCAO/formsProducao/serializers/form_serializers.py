@@ -1,4 +1,3 @@
-# filepath: c:\Users\Arthur Reis\Documents\PROJETOCASADAGRAFICA\CDGPRODUCAOBACK\CDGPRODUCAO\formsProducao\serializers\form_serializers.py
 from rest_framework import serializers
 from formsProducao.models.formulario import Formulario
 from django.utils import timezone

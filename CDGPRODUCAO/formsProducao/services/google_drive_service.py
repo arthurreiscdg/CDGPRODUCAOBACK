@@ -1,3 +1,15 @@
+import os
+import uuid
+import json
+import logging
+from django.utils import timezone
+from django.conf import settings
+from formsProducao.utils.drive import GoogleDriveService
+from formsProducao.models.formulario import Formulario
+from formsProducao.services.form_services import FormularioService
+
+logger = logging.getLogger(__name__)
+
 class BaseFormularioGoogleDriveService(FormularioService):
     """
     Classe base para serviços de formulário que usam o Google Drive
@@ -187,19 +199,8 @@ class BaseFormularioGoogleDriveService(FormularioService):
             
             # Salva as alterações
             formulario.save()
-            
-            return formulario
+                return formulario
             
         except Exception as e:
             logger.error(f"Erro ao atualizar formulário {cls.PASTA_NOME}: {str(e)}")
             raise
-
-
-
-
-
-
-
-
-
-    # Métodos adicionais específicos para coleguium podem ser adicionados aqui

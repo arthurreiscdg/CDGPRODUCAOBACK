@@ -1,5 +1,10 @@
 
 
+import logging
+from formsProducao.services.google_drive_service import BaseFormularioGoogleDriveService
+
+logger = logging.getLogger(__name__)
+
 class EliteService(BaseFormularioGoogleDriveService):
     """
     Serviço específico para o formulário Elite
