@@ -80,10 +80,64 @@ class PedidoService:
             logger.error(f"Erro ao enviar webhooks para pedido #{pedido_id}: {str(e)}")
         
         return pedido
-    
     @staticmethod
     def listar_status():
         """
         Lista todos os status de pedido disponíveis
         """
         return StatusPedido.objects.filter(ativo=True).order_by('ordem')
+        
+    @staticmethod
+    def atualizar_status_pedidos_em_lote(pedido_ids, novo_status_id):
+        """
+        Atualiza o status de múltiplos pedidos em lote
+        
+        Args:
+            pedido_ids: Lista de IDs dos pedidos a serem atualizados
+            novo_status_id: ID do novo status
+            
+        Returns:
+            dict: Dicionário com resultados da operação
+        """
+        if not pedido_ids:
+            return {
+                "sucesso": False,
+                "mensagem": "Nenhum pedido selecionado",
+                "atualizados": 0,
+                "falhas": 0,
+                "detalhes": []
+            }
+            
+        novo_status = get_object_or_404(StatusPedido, id=novo_status_id)
+        resultados = []
+        pedidos_atualizados = 0
+        falhas = 0
+        
+        # Processa cada pedido individualmente
+        for pedido_id in pedido_ids:
+            try:
+                # Usa o método existente para aproveitar o envio de webhooks
+                pedido = PedidoService.atualizar_status_pedido(pedido_id, novo_status_id)
+                resultados.append({
+                    "id": pedido_id,
+                    "numero_pedido": pedido.numero_pedido,
+                    "sucesso": True,
+                    "status_atual": pedido.status.nome,
+                })
+                pedidos_atualizados += 1
+            except Exception as e:
+                logger.error(f"Erro ao atualizar pedido #{pedido_id}: {str(e)}")
+                resultados.append({
+                    "id": pedido_id,
+                    "sucesso": False,
+                    "erro": str(e)
+                })
+                falhas += 1
+                
+        return {
+            "sucesso": pedidos_atualizados > 0,
+            "mensagem": f"{pedidos_atualizados} pedidos atualizados com sucesso. {falhas} falhas.",
+            "atualizados": pedidos_atualizados,
+            "falhas": falhas,
+            "detalhes": resultados
+        }

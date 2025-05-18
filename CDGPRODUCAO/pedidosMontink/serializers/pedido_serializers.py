@@ -40,5 +40,5 @@ class PedidoListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'titulo', 'valor_pedido', 'numero_pedido', 'nome_cliente',
             'email_cliente', 'status', 'status_nome', 'status_cor',
-            'nome_produto', 'quantidade', 'criado_em', 'atualizado_em'
+            'nome_produto', 'sku', 'quantidade', 'metodo_envio', 'criado_em', 'atualizado_em'
         ]

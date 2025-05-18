@@ -92,3 +92,46 @@ class StatusPedidoListView(generics.ListAPIView):
     """
     queryset = StatusPedido.objects.filter(ativo=True).order_by('ordem')
     serializer_class = StatusPedidoSerializer
+
+
+class AtualizarStatusPedidosEmLoteView(APIView):
+    """
+    View para atualizar o status de múltiplos pedidos em lote
+    """
+    def post(self, request):
+        # Obtém os IDs dos pedidos e o novo status
+        pedido_ids = request.data.get('pedido_ids', [])
+        status_id = request.data.get('status_id')
+        
+        # Valida os dados recebidos
+        if not pedido_ids:
+            return Response(
+                {"erro": "Nenhum pedido selecionado"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        if not status_id:
+            return Response(
+                {"erro": "ID do status não fornecido"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Converte para lista se veio como string
+        if isinstance(pedido_ids, str):
+            try:
+                pedido_ids = [int(pid.strip()) for pid in pedido_ids.split(',') if pid.strip()]
+            except ValueError:
+                return Response(
+                    {"erro": "Formato inválido para IDs dos pedidos"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        # Realiza a atualização em lote
+        try:
+            resultado = PedidoService.atualizar_status_pedidos_em_lote(pedido_ids, status_id)
+            return Response(resultado)
+        except Exception as e:
+            return Response(
+                {"erro": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
