@@ -199,7 +199,7 @@ class BaseFormularioGoogleDriveService(FormularioService):
             
             # Salva as alterações
             formulario.save()
-                return formulario
+            return formulario
             
         except Exception as e:
             logger.error(f"Erro ao atualizar formulário {cls.PASTA_NOME}: {str(e)}")
