@@ -42,9 +42,19 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
             logger.info(f"Modo de desenvolvimento local: {desenvolvimento_local}")
             
             # Gera um código de operação único
-            cod_op = cls.gerar_cod_op()
-              # Extrair as unidades dos dados do formulário
+            cod_op = cls.gerar_cod_op()            # Extrair as unidades dos dados do formulário
             unidades_data = dados_form.pop('unidades', [])
+            logger.info(f"Tipo de unidades_data: {type(unidades_data)}")
+            logger.info(f"Unidades recebidas: {unidades_data}")
+            
+            # Se unidades_data for uma string, tentar converter para lista
+            if isinstance(unidades_data, str):
+                try:
+                    import json
+                    unidades_data = json.loads(unidades_data)
+                    logger.info(f"Unidades convertidas de JSON para objeto: {unidades_data}")
+                except Exception as e:
+                    logger.error(f"Erro ao converter unidades de JSON para objeto: {str(e)}")
             
             # Dados do formulário para salvar
             form_data = {

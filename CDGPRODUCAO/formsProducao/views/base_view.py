@@ -24,7 +24,7 @@ class BaseFormularioView(APIView):
         Cria um novo formulário.
         
         Aceita dados do formulário como JSON ou multipart (se incluir arquivos).
-        """
+        """        
         try:            # Verifica se as classes necessárias foram definidas
             if not self.serializer_class or not self.service_class:
                 return Response(
@@ -39,8 +39,27 @@ class BaseFormularioView(APIView):
             usuario_atual = request.user if request.user.is_authenticated else None
             logger.debug(f"Usuário atual: {usuario_atual}")
             
+            # Processar dados da requisição
+            dados_requisicao = request.data.copy()
+            
+            # Verificar se há unidades no formato JSON e converter para objeto
+            if 'unidades' in dados_requisicao:
+                try:
+                    # Se as unidades estiverem no formato de string JSON, converter para objeto
+                    if isinstance(dados_requisicao['unidades'], str):
+                        import json
+                        unidades_json = json.loads(dados_requisicao['unidades'])
+                        dados_requisicao['unidades'] = unidades_json
+                        logger.debug(f"Unidades convertidas de JSON para objeto: {unidades_json}")
+                except Exception as e:
+                    logger.error(f"Erro ao processar unidades JSON: {str(e)}")
+                    return Response(
+                        {"detail": "Formato de unidades inválido", "error": str(e)},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
             # Processa primeiro os dados do formulário
-            serializer = self.serializer_class(data=request.data)
+            serializer = self.serializer_class(data=dados_requisicao)
             if not serializer.is_valid():
                 logger.error(f"Erro de validação: {serializer.errors}")
                 return Response(
