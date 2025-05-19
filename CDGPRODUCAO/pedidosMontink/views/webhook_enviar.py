@@ -44,39 +44,25 @@ class WebhookService:
                 logger.info(f"Status do pedido #{pedido.id} alterado para {novo_status.nome} sem webhooks")
                 
             return resultados
-            
-        # Preparar payload
+              # Preparar payload no formato solicitado
         payload = {
-            "evento": "atualizacao_status",
-            "pedido_id": pedido.id,
-            "numero_pedido": pedido.numero_pedido,
-            "status_novo": {
-                "id": novo_status.id,
-                "nome": novo_status.nome,
-                "descricao": novo_status.descricao
-            },
             "data": pedido.atualizado_em.isoformat(),
-            "detalhes_pedido": PedidoSerializer(pedido).data
+            "json": {
+                "casa_grafica_id": str(pedido.id),  # Convertendo para string conforme solicitado
+                "status_id": novo_status.id,
+                "status": novo_status.nome
+            }
         }
         
-        # Adicionar informações do status anterior se disponível
-        if old_status:
-            payload["status_anterior"] = {
-                "id": old_status.id,
-                "nome": old_status.nome,
-                "descricao": old_status.descricao
-            }
+        # Não adiciona o access_token ao payload, pois será adicionado para cada endpoint específico
+        # O access_token correto será obtido de cada endpoint durante o envio
             
         payload_json = json.dumps(payload)
         
         # Enviar para cada endpoint configurado
         for endpoint in endpoints:
-            try:
-                # Preparar URL com token se necessário
+            try:                # Preparar URL sem anexar token como parâmetro
                 url = endpoint.url
-                if endpoint.access_token:
-                    separator = "?" if "?" not in url else "&"
-                    url = f"{url}{separator}token={endpoint.access_token}"
                 
                 # Preparar headers
                 headers = {
@@ -94,15 +80,26 @@ class WebhookService:
                     except json.JSONDecodeError:
                         logger.error(f"Headers adicionais inválidos para o endpoint {endpoint.nome}")
                 
-                # Enviar requisição
-                response = requests.post(url, data=payload_json, headers=headers, timeout=10)
+                # Adicionar o access_token ao payload específico para este endpoint
+                endpoint_payload = json.loads(payload_json)
                 
-                # Registrar resultado
+                # Adicionar o access_token ao payload conforme solicitado
+                if endpoint.access_token:
+                    endpoint_payload["access_token"] = endpoint.access_token
+                else:
+                    endpoint_payload["access_token"] = ""  # String vazia se não houver token
+                
+                # Converter o payload com o token incluído de volta para JSON
+                endpoint_payload_json = json.dumps(endpoint_payload)
+                
+                # Enviar requisição com o payload específico para este endpoint
+                response = requests.post(url, data=endpoint_payload_json, headers=headers, timeout=10)
+                  # Registrar resultado
                 webhook_enviado = WebhookStatusEnviado.objects.create(
                     pedido=pedido,
                     status=novo_status.nome,
                     url_destino=url,
-                    payload=payload_json,
+                    payload=endpoint_payload_json,  # Usando o payload específico do endpoint com access_token
                     resposta=response.text[:1000],  # Limitamos o tamanho da resposta
                     codigo_http=response.status_code,
                     sucesso=response.ok
@@ -117,13 +114,15 @@ class WebhookService:
                 
             except Exception as e:
                 logger.error(f"Erro ao enviar webhook para {endpoint.nome}: {str(e)}")
+                  # Registrar falha
+                # Tentar usar o payload específico do endpoint se disponível, senão usar o payload original
+                payload_to_save = endpoint_payload_json if 'endpoint_payload_json' in locals() else payload_json
                 
-                # Registrar falha
                 webhook_enviado = WebhookStatusEnviado.objects.create(
                     pedido=pedido,
                     status=novo_status.nome,
                     url_destino=url if 'url' in locals() else endpoint.url,
-                    payload=payload_json,
+                    payload=payload_to_save,
                     resposta=str(e),
                     sucesso=False
                 )
