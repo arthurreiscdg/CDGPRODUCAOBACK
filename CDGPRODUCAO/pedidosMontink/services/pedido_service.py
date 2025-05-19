@@ -38,12 +38,15 @@ class PedidoService:
         """
         Obtém um pedido específico pelo ID
         """
-        return get_object_or_404(Pedido.objects.select_related('status'), id=pedido_id)
-    @staticmethod
+        return get_object_or_404(Pedido.objects.select_related('status'), id=pedido_id)    @staticmethod
     def atualizar_status_pedido(pedido_id, novo_status_id):
         """
-        Atualiza o status de um pedido e envia webhook para os endpoints configurados
+        Atualiza o status de um pedido e envia webhook para os endpoints configurados.
+        O status só é atualizado se todos os webhooks forem enviados com sucesso.
         """
+        from django.db import transaction
+        from ..models.webhook_config import WebhookEndpointConfig
+        
         pedido = get_object_or_404(Pedido, id=pedido_id)
         status_anterior = pedido.status
         novo_status = get_object_or_404(StatusPedido, id=novo_status_id)
@@ -52,41 +55,52 @@ class PedidoService:
         if pedido.status.id == novo_status.id:
             logger.info(f"Status do pedido #{pedido_id} não foi alterado (já era {pedido.status.nome})")
             return pedido
-        
-        # Atualiza o status no banco de dados
-        pedido.status = novo_status
-        pedido.save(update_fields=['status', 'atualizado_em'])
-        
-        logger.info(f"Status do pedido #{pedido_id} alterado de {status_anterior.nome} para {novo_status.nome}")
+            
+        # Verificar se existem endpoints configurados
+        endpoints = WebhookEndpointConfig.objects.filter(ativo=True, auto_enviar=True)
+        if not endpoints.exists():
+            # Se não há endpoints configurados, atualizamos o status diretamente
+            logger.info(f"Nenhum endpoint de webhook configurado. Atualizando status diretamente.")
+            pedido.status = novo_status
+            pedido.save(update_fields=['status', 'atualizado_em'])
+            logger.info(f"Status do pedido #{pedido_id} alterado de {status_anterior.nome} para {novo_status.nome}")
+            return pedido
         
         try:
-            # Envia webhook para todos os endpoints configurados
-            resultados = WebhookService.enviar_webhook_status(
-                pedido=pedido,
-                novo_status=novo_status,
-                old_status=status_anterior
-            )
-            
-            # Registra o resultado no log
-            sucessos = sum(1 for r in resultados if r.sucesso)
-            falhas = len(resultados) - sucessos
-            
-            if resultados:
-                logger.info(f"Webhooks enviados para pedido #{pedido_id}: total={len(resultados)}, sucessos={sucessos}, falhas={falhas}")
-            else:
-                logger.info(f"Nenhum webhook foi configurado para envio automático para o pedido #{pedido_id}")
+            # Usamos uma transação para garantir atomicidade
+            with transaction.atomic():
+                # Tenta enviar os webhooks primeiro, sem alterar o status
+                resultados = WebhookService.enviar_webhook_status(
+                    pedido=pedido,
+                    novo_status=novo_status,
+                    old_status=status_anterior,
+                    atualizar_pedido=False  # Não atualiza o pedido automaticamente
+                )
+                
+                # Verifica se houve falha em algum endpoint
+                falhas = sum(1 for r in resultados if not r.sucesso)
+                if falhas > 0:
+                    logger.error(f"Falha ao enviar {falhas} webhooks. Status do pedido #{pedido_id} NÃO foi alterado.")
+                    raise Exception(f"Falha ao enviar webhooks para {falhas} endpoints. Status não foi alterado.")
+                
+                # Se todos os webhooks foram enviados com sucesso, atualiza o status
+                pedido.status = novo_status
+                pedido.save(update_fields=['status', 'atualizado_em'])
+                
+                logger.info(f"Status do pedido #{pedido_id} alterado de {status_anterior.nome} para {novo_status.nome}")
+                logger.info(f"Webhooks enviados com sucesso: total={len(resultados)}")
+                
+                return pedido
                 
         except Exception as e:
-            logger.error(f"Erro ao enviar webhooks para pedido #{pedido_id}: {str(e)}")
-        
-        return pedido
+            logger.error(f"Erro ao processar atualização de status do pedido #{pedido_id}: {str(e)}")
+            raise Exception(f"Não foi possível atualizar o status: {str(e)}")
     @staticmethod
     def listar_status():
         """
         Lista todos os status de pedido disponíveis
         """
         return StatusPedido.objects.filter(ativo=True).order_by('ordem')
-        
     @staticmethod
     def atualizar_status_pedidos_em_lote(pedido_ids, novo_status_id):
         """

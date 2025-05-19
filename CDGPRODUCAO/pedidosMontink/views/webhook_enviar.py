@@ -1,5 +1,7 @@
+# filepath: c:\Users\Arthur Reis\Documents\PROJETOCASADAGRAFICA\CDGPRODUCAOBACK\CDGPRODUCAO\pedidosMontink\views\webhook_enviar.py
 import json
 import requests
+import logging
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,14 +9,13 @@ from ..models.webhook_config import WebhookEndpointConfig, WebhookStatusEnviado
 from ..models.webhook_pedido import Pedido, StatusPedido
 from ..serializers.pedido_serializers import PedidoSerializer
 from django.shortcuts import get_object_or_404
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 class WebhookService:
     @staticmethod
-    def enviar_webhook_status(pedido, novo_status, old_status=None):
+    def enviar_webhook_status(pedido, novo_status, old_status=None, atualizar_pedido=True):
         """
         Envia webhooks para todos os endpoints configurados 
         quando um pedido muda de status
@@ -23,6 +24,8 @@ class WebhookService:
             pedido: O objeto Pedido que teve o status alterado
             novo_status: O objeto StatusPedido novo
             old_status: O objeto StatusPedido anterior (opcional)
+            atualizar_pedido: Se True, atualiza o status do pedido automaticamente após enviar os webhooks.
+                              Se False, não atualiza o status do pedido.
         
         Returns:
             list: Lista de WebhookStatusEnviado com os resultados dos envios
@@ -33,6 +36,13 @@ class WebhookService:
         
         if not endpoints.exists():
             logger.warning("Nenhum endpoint de webhook configurado ou ativo")
+            
+            # Se não há endpoints e atualizar_pedido=True, atualiza o pedido
+            if atualizar_pedido:
+                pedido.status = novo_status
+                pedido.save(update_fields=['status', 'atualizado_em'])
+                logger.info(f"Status do pedido #{pedido.id} alterado para {novo_status.nome} sem webhooks")
+                
             return resultados
             
         # Preparar payload
@@ -120,6 +130,18 @@ class WebhookService:
                 
                 resultados.append(webhook_enviado)
         
+        # Depois de enviar todos os webhooks, atualiza o status do pedido se solicitado
+        if atualizar_pedido:
+            # Verificar se todos os webhooks foram enviados com sucesso
+            falhas = sum(1 for r in resultados if not r.sucesso)
+            if falhas == 0:
+                # Atualiza o status apenas se não houve falhas
+                pedido.status = novo_status
+                pedido.save(update_fields=['status', 'atualizado_em'])
+                logger.info(f"Status do pedido #{pedido.id} alterado para {novo_status.nome} após webhooks bem-sucedidos")
+            else:
+                logger.error(f"Status do pedido #{pedido.id} NÃO foi alterado devido a {falhas} falhas em webhooks")
+                
         return resultados
 
 
