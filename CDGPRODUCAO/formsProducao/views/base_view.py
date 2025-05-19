@@ -74,12 +74,12 @@ class BaseFormularioView(APIView):
                 arquivo_pdf,
                 usuario=usuario_atual
             )
-            
-            # Retorna os dados do formulário criado
+              # Retorna os dados do formulário criado
             return Response({
                 "detail": "Formulário criado com sucesso",
                 "cod_op": formulario.cod_op,
-                "link_download": formulario.link_download
+                "link_download": formulario.link_download,
+                "web_view_link": formulario.web_view_link
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
@@ -173,12 +173,12 @@ class BaseFormularioView(APIView):
                 serializer.validated_data,
                 arquivo_pdf
             )
-            
-            # Retorna os dados atualizados
+              # Retorna os dados atualizados
             return Response({
                 "detail": "Formulário atualizado com sucesso",
                 "cod_op": formulario.cod_op,
-                "link_download": formulario.link_download
+                "link_download": formulario.link_download,
+                "web_view_link": formulario.web_view_link
             })
             
         except Exception as e:

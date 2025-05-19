@@ -47,11 +47,11 @@ class Formulario(models.Model):
     formato = models.CharField(max_length=10, choices=FORMATO_CHOICES, default='A4', null=True, blank=True)
     cor_impressao = models.CharField(max_length=10, choices=COR_IMPRESSAO_CHOICES, default='PB', null=True, blank=True)
     impressao = models.CharField(max_length=20, choices=IMPRESSAO_CHOICES, default='1_LADO', null=True, blank=True)
-    
-    # Campos de ArquivoPDF
+      # Campos de ArquivoPDF
     arquivo = models.FileField(upload_to='pdfs/', null=True, blank=True)
     cod_op = models.CharField(max_length=10, null=True, blank=True)
     link_download = models.URLField(max_length=500, null=True, blank=True)
+    web_view_link = models.URLField(max_length=500, null=True, blank=True, verbose_name="Link de visualização")
     json_link = models.URLField(max_length=500, null=True, blank=True)    # Campos de controle temporal
     criado_em = models.DateTimeField(default=timezone.now)
     atualizado_em = models.DateTimeField(auto_now=True)

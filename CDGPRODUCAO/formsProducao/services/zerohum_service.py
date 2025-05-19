@@ -96,12 +96,14 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
                         
                         # Log do resultado do upload
                         logger.info(f"Resultado do upload para o Google Drive: {resultado_upload}")
-                        
-                        if resultado_upload:
-                            # Atualiza o formulário com o link de download
+                          if resultado_upload:
+                            # Atualiza o formulário com os links
                             download_link = resultado_upload.get('download_link')
+                            web_view_link = resultado_upload.get('web_link')
                             logger.info(f"Link de download: {download_link}")
+                            logger.info(f"Link de visualização: {web_view_link}")
                             formulario.link_download = download_link
+                            formulario.web_view_link = web_view_link
                             
                             # Cria um JSON com os detalhes do formulário
                             dados_json = {
@@ -111,7 +113,8 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
                                 'unidade': dados_form.get('unidade_nome'),
                                 'titulo': dados_form.get('titulo'),
                                 'data_entrega': str(dados_form.get('data_entrega')),
-                                'link_pdf': download_link
+                                'link_pdf': download_link,
+                                'link_visualizacao': web_view_link
                             }
                             
                             formulario.json_link = json.dumps(dados_json)

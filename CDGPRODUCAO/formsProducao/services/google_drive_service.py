@@ -116,11 +116,15 @@ class BaseFormularioGoogleDriveService(FormularioService):
                         formulario.delete()
                         return None
                         
-                    # Se o upload for bem-sucedido, atualiza o formulário com o link de download
+                    # Se o upload for bem-sucedido, atualiza o formulário com os links
                     download_link = resultado_upload.get('download_link')
+                    web_view_link = resultado_upload.get('web_link')
                     logger.info(f"Link de download: {download_link}")
-                    formulario.link_download = download_link  # Usando o link de download direto
-                      # Cria um JSON com os detalhes do formulário
+                    logger.info(f"Link de visualização: {web_view_link}")
+                    formulario.link_download = download_link
+                    formulario.web_view_link = web_view_link
+                    
+                    # Cria um JSON com os detalhes do formulário
                     dados_json = {
                         'cod_op': cod_op,
                         'nome': dados_form.get('nome'),
@@ -128,7 +132,8 @@ class BaseFormularioGoogleDriveService(FormularioService):
                         'unidade': dados_form.get('unidade_nome'),
                         'titulo': dados_form.get('titulo'),
                         'data_entrega': str(dados_form.get('data_entrega')),
-                        'link_pdf': download_link  # Usando a mesma variável de download_link já verificada
+                        'link_pdf': download_link,
+                        'link_visualizacao': web_view_link
                     }
                     
                     formulario.json_link = json.dumps(dados_json)
@@ -161,7 +166,7 @@ class BaseFormularioGoogleDriveService(FormularioService):
             # Atualiza os campos do formulário com os novos dados
             for campo, valor in dados_atualizados.items():
                 # Não atualiza campos somente leitura
-                if campo not in ['cod_op', 'arquivo', 'link_download', 'json_link', 'criado_em', 'atualizado_em']:
+                if campo not in ['cod_op', 'arquivo', 'link_download', 'web_view_link', 'json_link', 'criado_em', 'atualizado_em']:
                     setattr(formulario, campo, valor)
             
             # Se tiver um novo arquivo PDF, processa-o
@@ -174,14 +179,17 @@ class BaseFormularioGoogleDriveService(FormularioService):
                 if caminho_local:
                     # Configura a pasta no Google Drive se necessário
                     if cls.PASTA_ID is None:
-                        cls.setup_pasta_drive()                    # Faz upload para o Google Drive
+                        cls.setup_pasta_drive()
+                    
+                    # Faz upload para o Google Drive
                     drive_service = GoogleDriveService()
                     resultado_upload = drive_service.upload_pdf(
                         caminho_local, 
                         nome_arquivo,
                         cls.PASTA_ID
                     )
-                      # Log do resultado do upload para diagnóstico
+                    
+                    # Log do resultado do upload para diagnóstico
                     logger.info(f"Resultado do upload para o Google Drive na atualização: {resultado_upload}")
                     
                     # Se o upload falhar, não atualize o formulário e registre o erro
@@ -189,11 +197,15 @@ class BaseFormularioGoogleDriveService(FormularioService):
                         logger.error(f"Falha ao fazer upload do PDF para o Google Drive. Formulário {formulario.cod_op} não foi atualizado.")
                         return formulario
                     
-                    # Se o upload for bem-sucedido, atualiza o formulário com o link de download
+                    # Se o upload for bem-sucedido, atualiza o formulário com os links
                     download_link = resultado_upload.get('download_link')
+                    web_view_link = resultado_upload.get('web_link')
                     logger.info(f"Link de download na atualização: {download_link}")
+                    logger.info(f"Link de visualização na atualização: {web_view_link}")
                     formulario.link_download = download_link
-                          # Atualiza o JSON com os detalhes do formulário
+                    formulario.web_view_link = web_view_link
+                    
+                    # Atualiza o JSON com os detalhes do formulário
                     dados_json = {
                         'cod_op': formulario.cod_op,
                         'nome': formulario.nome,
@@ -201,7 +213,8 @@ class BaseFormularioGoogleDriveService(FormularioService):
                         'unidade': formulario.unidade_nome,
                         'titulo': formulario.titulo,
                         'data_entrega': str(formulario.data_entrega),
-                        'link_pdf': download_link  # Usando a mesma variável de download_link já verificada
+                        'link_pdf': download_link,
+                        'link_visualizacao': web_view_link
                     }
                     
                     formulario.json_link = json.dumps(dados_json)
