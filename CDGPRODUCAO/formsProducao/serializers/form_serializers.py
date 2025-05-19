@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from formsProducao.models.formulario import Formulario
+from formsProducao.models.unidade import Unidade
+from formsProducao.serializers.unidade_serializers import UnidadeCreateSerializer, UnidadeSerializer
 from django.utils import timezone
 from django.contrib.auth.models import User
 
@@ -20,10 +22,52 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
     """
     arquivo = serializers.FileField(required=False, write_only=True)
     usuario_info = UserBasicInfoSerializer(source='usuario', read_only=True)
+    unidades = UnidadeCreateSerializer(many=True, required=False)
+    unidades_info = UnidadeSerializer(source='unidades', many=True, read_only=True)
     
     class Meta:
         model = Formulario
         fields = '__all__'
-        read_only_fields = ('cod_op', 'link_download', 'json_link', 'criado_em', 'atualizado_em', 'usuario_info')
-
-
+        read_only_fields = ('cod_op', 'link_download', 'web_view_link', 'json_link', 'criado_em', 'atualizado_em', 'usuario_info')
+    
+    def create(self, validated_data):
+        # Extrair as unidades dos dados validados
+        unidades_data = validated_data.pop('unidades', [])
+        
+        # Criar o formulário
+        formulario = super().create(validated_data)
+        
+        # Criar as unidades relacionadas
+        for unidade_data in unidades_data:
+            Unidade.objects.create(formulario=formulario, **unidade_data)
+        
+        return formulario
+    
+    def update(self, instance, validated_data):
+        # Extrair as unidades dos dados validados
+        unidades_data = validated_data.pop('unidades', [])
+        
+        # Atualizar o formulário
+        instance = super().update(instance, validated_data)
+        
+        # Se houver novas unidades, atualizar
+        if unidades_data:
+            # Remover as unidades antigas
+            instance.unidades.all().delete()
+            
+            # Criar as novas unidades
+            for unidade_data in unidades_data:
+                Unidade.objects.create(formulario=instance, **unidade_data)
+        
+        return instance
+    
+    def to_representation(self, instance):
+        """
+        Customiza a representação para incluir as unidades
+        """
+        representation = super().to_representation(instance)
+        
+        # Adiciona as unidades
+        representation['unidades'] = UnidadeSerializer(instance.unidades.all(), many=True).data
+        
+        return representation

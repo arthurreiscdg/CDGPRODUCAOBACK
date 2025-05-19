@@ -31,14 +31,9 @@ class Formulario(models.Model):
         blank=True,
         verbose_name="Usuário que enviou"
     )
-    
-    # Campos de Contato
+      # Campos de Contato
     nome = models.CharField(max_length=100, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
-    
-    # Campos de Unidade
-    unidade_nome = models.CharField(max_length=50, null=True, blank=True)
-    unidade_quantidade = models.IntegerField(null=True, blank=True)
     
     # Campos de Configuração de Impressão
     titulo = models.CharField(max_length=255, null=True, blank=True)

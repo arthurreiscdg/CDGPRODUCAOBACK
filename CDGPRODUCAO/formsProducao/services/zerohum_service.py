@@ -43,6 +43,8 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
             
             # Gera um código de operação único
             cod_op = cls.gerar_cod_op()
+              # Extrair as unidades dos dados do formulário
+            unidades_data = dados_form.pop('unidades', [])
             
             # Dados do formulário para salvar
             form_data = {
@@ -67,12 +69,20 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
                 
                 # Define o link local
                 form_data['link_download'] = f"/media/pdfs/{nome_arquivo}"
-                form_data['arquivo'] = f"pdfs/{nome_arquivo}"
-              # Cria o formulário no banco de dados, incluindo o usuário que enviou
+                form_data['arquivo'] = f"pdfs/{nome_arquivo}"              # Cria o formulário no banco de dados, incluindo o usuário que enviou
             formulario = Formulario.objects.create(
                 **form_data,
                 usuario=usuario
             )
+            
+            # Cria as unidades relacionadas ao formulário
+            from formsProducao.models.unidade import Unidade
+            for unidade_data in unidades_data:
+                Unidade.objects.create(
+                    formulario=formulario,
+                    nome=unidade_data['nome'],
+                    quantidade=unidade_data['quantidade']
+                )
               # Se não estiver em desenvolvimento local, tenta fazer upload para o Google Drive
             if not desenvolvimento_local and arquivo_pdf:
                 try:
@@ -104,13 +114,21 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
                             logger.info(f"Link de visualização: {web_view_link}")
                             formulario.link_download = download_link
                             formulario.web_view_link = web_view_link
+                              # Obtém as unidades relacionadas a este formulário
+                            unidades = formulario.unidades.all()
+                            unidades_json = []
+                            for unidade in unidades:
+                                unidades_json.append({
+                                    'nome': unidade.nome,
+                                    'quantidade': unidade.quantidade
+                                })
                             
                             # Cria um JSON com os detalhes do formulário
                             dados_json = {
                                 'cod_op': cod_op,
                                 'nome': dados_form.get('nome'),
                                 'email': dados_form.get('email'),
-                                'unidade': dados_form.get('unidade_nome'),
+                                'unidades': unidades_json,
                                 'titulo': dados_form.get('titulo'),
                                 'data_entrega': str(dados_form.get('data_entrega')),
                                 'link_pdf': download_link,
