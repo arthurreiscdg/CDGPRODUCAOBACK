@@ -28,18 +28,20 @@ def test_webhook_payload():
             "valor_pedido": "50.00",
             # ... outros campos
         }
-    }
+    }    # Novo formato do payload conforme solicitado
+    # Garantindo que access_token venha imediatamente após data
+    from collections import OrderedDict
     
-    # Novo formato do payload conforme solicitado
-    payload_novo = {
-        "data": data_atual,
-        "access_token": "abc123",  # Este valor será obtido de cada endpoint
-        "json": {
-            "casa_grafica_id": "123",
+    # Usando OrderedDict para garantir a ordem exata dos campos
+    payload_novo = OrderedDict([
+        ("data", data_atual),
+        ("access_token", "abc123"),  # Este valor será obtido de cada endpoint
+        ("json", {
+            "casa_grafica_id": "456789",  # Usando o número do pedido (numero_pedido)
             "status_id": 2,
             "status": "Em Produção"
-        }
-    }
+        })
+    ])
     
     print("== Formato ANTIGO do payload ==")
     pprint(payload_antigo)

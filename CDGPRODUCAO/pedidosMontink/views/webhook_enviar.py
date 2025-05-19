@@ -43,19 +43,18 @@ class WebhookService:
                 pedido.save(update_fields=['status', 'atualizado_em'])
                 logger.info(f"Status do pedido #{pedido.id} alterado para {novo_status.nome} sem webhooks")
                 
-            return resultados
-              # Preparar payload no formato solicitado
+            return resultados        # Preparar payload no formato solicitado
         payload = {
             "data": pedido.atualizado_em.isoformat(),
+            "access_token": "",  # Valor inicial vazio que será substituído para cada endpoint
             "json": {
-                "casa_grafica_id": str(pedido.id),  # Convertendo para string conforme solicitado
+                "casa_grafica_id": str(pedido.numero_pedido),  # Usando o número do pedido conforme solicitado
                 "status_id": novo_status.id,
                 "status": novo_status.nome
             }
         }
         
-        # Não adiciona o access_token ao payload, pois será adicionado para cada endpoint específico
-        # O access_token correto será obtido de cada endpoint durante o envio
+        # O access_token correto será definido individualmente para cada endpoint
             
         payload_json = json.dumps(payload)
         
@@ -79,17 +78,22 @@ class WebhookService:
                         headers.update(headers_adicionais)
                     except json.JSONDecodeError:
                         logger.error(f"Headers adicionais inválidos para o endpoint {endpoint.nome}")
+                  # Adicionar o access_token ao payload específico para este endpoint
+                # Vamos reconstruir o payload para garantir a ordem correta dos campos
+                token_value = endpoint.access_token if endpoint.access_token else ""
                 
-                # Adicionar o access_token ao payload específico para este endpoint
-                endpoint_payload = json.loads(payload_json)
+                # Criando um novo dicionário com a ordem correta dos campos (data, access_token, json)
+                endpoint_payload = {
+                    "data": pedido.atualizado_em.isoformat(),
+                    "access_token": token_value,
+                    "json": {
+                        "casa_grafica_id": str(pedido.numero_pedido),
+                        "status_id": novo_status.id,
+                        "status": novo_status.nome
+                    }
+                }
                 
-                # Adicionar o access_token ao payload conforme solicitado
-                if endpoint.access_token:
-                    endpoint_payload["access_token"] = endpoint.access_token
-                else:
-                    endpoint_payload["access_token"] = ""  # String vazia se não houver token
-                
-                # Converter o payload com o token incluído de volta para JSON
+                # Converter o payload com o token incluído para JSON
                 endpoint_payload_json = json.dumps(endpoint_payload)
                 
                 # Enviar requisição com o payload específico para este endpoint
