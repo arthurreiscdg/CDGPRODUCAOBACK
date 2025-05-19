@@ -43,11 +43,27 @@ class BaseFormularioView(APIView):
                     {"detail": "Dados inválidos", "errors": serializer.errors},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
-            # Verifica se tem arquivo PDF anexado
+              # Verifica se tem arquivo PDF anexado
             arquivo_pdf = None
             if 'arquivo' in request.FILES:
-                arquivo_pdf = request.FILES['arquivo'].read()
+                arquivo = request.FILES['arquivo']
+                
+                # Validação básica do tipo de arquivo
+                if not arquivo.name.lower().endswith('.pdf'):
+                    return Response(
+                        {"detail": "O arquivo deve ser um PDF válido."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Validação do tamanho (max 10MB)
+                if arquivo.size > 10 * 1024 * 1024:
+                    return Response(
+                        {"detail": "O arquivo não pode exceder 10MB."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Lê o conteúdo do arquivo
+                arquivo_pdf = arquivo.read()
                 
             # Processa o formulário
             formulario = self.service_class.processar_formulario(
