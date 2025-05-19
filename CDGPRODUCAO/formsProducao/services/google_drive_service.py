@@ -64,9 +64,8 @@ class BaseFormularioGoogleDriveService(FormularioService):
         except Exception as e:
             logger.error(f"Erro ao configurar pasta no Google Drive: {str(e)}")
             return None
-    
     @classmethod
-    def processar_formulario(cls, dados_form, arquivo_pdf=None):
+    def processar_formulario(cls, dados_form, arquivo_pdf=None, usuario=None):
         """
         Processa um formulário, salvando-o no banco de dados e 
         fazendo upload do PDF no Google Drive.
@@ -74,6 +73,7 @@ class BaseFormularioGoogleDriveService(FormularioService):
         Args:
             dados_form (dict): Dados do formulário validados
             arquivo_pdf (bytes, optional): Conteúdo do arquivo PDF
+            usuario (User, optional): Usuário logado que está enviando o formulário
             
         Returns:
             Formulario: Objeto do formulário criado e processado
@@ -85,7 +85,8 @@ class BaseFormularioGoogleDriveService(FormularioService):
             # Cria uma instância do formulário
             formulario = Formulario.objects.create(
                 **dados_form,
-                cod_op=cod_op
+                cod_op=cod_op,
+                usuario=usuario  # Associa o usuário ao formulário
             )
             
             # Se tiver um arquivo PDF, processa-o

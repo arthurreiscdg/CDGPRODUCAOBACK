@@ -2,8 +2,9 @@
 import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,7 @@ class BaseFormularioView(APIView):
         
         Aceita dados do formulário como JSON ou multipart (se incluir arquivos).
         """
-        try:
-            # Verifica se as classes necessárias foram definidas
+        try:            # Verifica se as classes necessárias foram definidas
             if not self.serializer_class or not self.service_class:
                 return Response(
                     {"detail": "View não configurada corretamente"},
@@ -34,6 +34,10 @@ class BaseFormularioView(APIView):
                 
             # Log de depuração
             logger.debug(f"Recebendo dados para formulário: {request.data}")
+            
+            # Obtenha o usuário atual (se autenticado)
+            usuario_atual = request.user if request.user.is_authenticated else None
+            logger.debug(f"Usuário atual: {usuario_atual}")
             
             # Processa primeiro os dados do formulário
             serializer = self.serializer_class(data=request.data)
@@ -64,11 +68,11 @@ class BaseFormularioView(APIView):
                 
                 # Lê o conteúdo do arquivo
                 arquivo_pdf = arquivo.read()
-                
-            # Processa o formulário
+                  # Processa o formulário
             formulario = self.service_class.processar_formulario(
                 serializer.validated_data,
-                arquivo_pdf
+                arquivo_pdf,
+                usuario=usuario_atual
             )
             
             # Retorna os dados do formulário criado

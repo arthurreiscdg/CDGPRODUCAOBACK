@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 class Formulario(models.Model):
     # Choices para formatos, cores e tipos de impressão
@@ -21,8 +22,16 @@ class Formulario(models.Model):
         ('1_LADO', 'Um lado'),
         ('2_LADOS', 'Frente e verso'),
         ('LIVRETO', 'Livreto')
-    ]
-
+    ]    # Relação com o usuário que enviou o formulário
+    usuario = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL,  # Se o usuário for excluído, mantém o formulário
+        related_name='formularios',
+        null=True,
+        blank=True,
+        verbose_name="Usuário que enviou"
+    )
+    
     # Campos de Contato
     nome = models.CharField(max_length=100, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
@@ -43,8 +52,14 @@ class Formulario(models.Model):
     arquivo = models.FileField(upload_to='pdfs/', null=True, blank=True)
     cod_op = models.CharField(max_length=10, null=True, blank=True)
     link_download = models.URLField(max_length=500, null=True, blank=True)
-    json_link = models.URLField(max_length=500, null=True, blank=True)
-
-    # Campos de controle temporal
+    json_link = models.URLField(max_length=500, null=True, blank=True)    # Campos de controle temporal
     criado_em = models.DateTimeField(default=timezone.now)
     atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Formulário"
+        verbose_name_plural = "Formulários"
+        ordering = ['-criado_em']
+        
+    def __str__(self):
+        return f"Formulário {self.id} - {self.titulo or 'Sem título'} ({self.nome or 'Anônimo'})"

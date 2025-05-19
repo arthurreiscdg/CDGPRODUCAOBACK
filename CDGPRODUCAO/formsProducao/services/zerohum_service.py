@@ -19,13 +19,14 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
     PREFIXO_COD_OP = "ZH"
     
     @classmethod
-    def processar_formulario(cls, dados_form, arquivo_pdf=None):
+    def processar_formulario(cls, dados_form, arquivo_pdf=None, usuario=None):
         """
         Implementação customizada para processar um formulário ZeroHum
         
         Args:
             dados_form (dict): Dados do formulário validados
             arquivo_pdf (bytes, optional): Conteúdo do arquivo PDF
+            usuario (User, optional): Usuário logado que está enviando o formulário
             
         Returns:
             Formulario: Objeto do formulário criado e processado
@@ -62,14 +63,16 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
                 # Define o link local
                 form_data['link_download'] = f"/media/pdfs/{nome_arquivo}"
                 form_data['arquivo'] = f"pdfs/{nome_arquivo}"
-            
-            # Cria o formulário no banco de dados
-            formulario = Formulario.objects.create(**form_data)
+              # Cria o formulário no banco de dados, incluindo o usuário que enviou
+            formulario = Formulario.objects.create(
+                **form_data,
+                usuario=usuario
+            )
             
             # Se não estiver em desenvolvimento local, tenta fazer upload para o Google Drive
             if not desenvolvimento_local and arquivo_pdf:
                 # Usa a implementação do serviço base
-                return super().processar_formulario(dados_form, arquivo_pdf)
+                return super().processar_formulario(dados_form, arquivo_pdf, usuario=usuario)
             
             return formulario
                 
