@@ -38,25 +38,62 @@ class BaseFormularioView(APIView):
             # Obtenha o usuário atual (se autenticado)
             usuario_atual = request.user if request.user.is_authenticated else None
             logger.debug(f"Usuário atual: {usuario_atual}")
-            
-            # Processar dados da requisição
+              # Processar dados da requisição
             dados_requisicao = request.data.copy()
             
-            # Verificar se há unidades no formato JSON e converter para objeto
-            if 'unidades' in dados_requisicao:
+            # Tratar unidades enviadas em formato de form-data
+            unidades = []
+            unidade_keys = [k for k in dados_requisicao.keys() if k.startswith('unidades[')]
+            
+            # Extrair índices das unidades (unidades[0], unidades[1], etc.)
+            indices_unidades = set()
+            for key in unidade_keys:
                 try:
-                    # Se as unidades estiverem no formato de string JSON, converter para objeto
-                    if isinstance(dados_requisicao['unidades'], str):
-                        import json
-                        unidades_json = json.loads(dados_requisicao['unidades'])
-                        dados_requisicao['unidades'] = unidades_json
-                        logger.debug(f"Unidades convertidas de JSON para objeto: {unidades_json}")
+                    # Extrai o índice da unidade do formato unidades[0][nome]
+                    indice = int(key.split('[')[1].split(']')[0])
+                    indices_unidades.add(indice)
+                except (IndexError, ValueError):
+                    continue
+            
+            # Para cada índice, construir um objeto de unidade
+            for indice in indices_unidades:
+                unidade = {}
+                nome_key = f'unidades[{indice}][nome]'
+                qtd_key = f'unidades[{indice}][quantidade]'
+                
+                if nome_key in dados_requisicao:
+                    unidade['nome'] = dados_requisicao[nome_key]
+                if qtd_key in dados_requisicao:
+                    try:
+                        unidade['quantidade'] = int(dados_requisicao[qtd_key])
+                    except (TypeError, ValueError):
+                        unidade['quantidade'] = 1
+                
+                if unidade:
+                    unidades.append(unidade)
+                    # Remover os campos individuais do request data
+                    if nome_key in dados_requisicao:
+                        del dados_requisicao[nome_key]
+                    if qtd_key in dados_requisicao:
+                        del dados_requisicao[qtd_key]
+            
+            # Log das unidades processadas
+            logger.debug(f"Unidades processadas do form-data: {unidades}")
+            
+            # Adicionar as unidades processadas ao request data
+            if unidades:
+                dados_requisicao['unidades'] = unidades
+            
+            # Adicionalmente, verificar se há unidades no formato JSON e converter para objeto
+            if 'unidades' in dados_requisicao and isinstance(dados_requisicao['unidades'], str):
+                try:
+                    import json
+                    unidades_json = json.loads(dados_requisicao['unidades'])
+                    dados_requisicao['unidades'] = unidades_json
+                    logger.debug(f"Unidades convertidas de JSON para objeto: {unidades_json}")
                 except Exception as e:
                     logger.error(f"Erro ao processar unidades JSON: {str(e)}")
-                    return Response(
-                        {"detail": "Formato de unidades inválido", "error": str(e)},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    # Não retornar erro, pois já temos as unidades processadas do form-data
             
             # Processa primeiro os dados do formulário
             serializer = self.serializer_class(data=dados_requisicao)

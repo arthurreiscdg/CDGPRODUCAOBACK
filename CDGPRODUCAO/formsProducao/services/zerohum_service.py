@@ -47,6 +47,11 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
             logger.info(f"Tipo de unidades_data: {type(unidades_data)}")
             logger.info(f"Unidades recebidas: {unidades_data}")
             
+            # Se não houver unidades, verificar se foi um erro de processamento
+            if not unidades_data:
+                logger.warning("Nenhuma unidade encontrada nos dados validados")
+                logger.debug(f"Dados completos recebidos: {dados_form}")
+            
             # Se unidades_data for uma string, tentar converter para lista
             if isinstance(unidades_data, str):
                 try:
@@ -55,6 +60,13 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
                     logger.info(f"Unidades convertidas de JSON para objeto: {unidades_data}")
                 except Exception as e:
                     logger.error(f"Erro ao converter unidades de JSON para objeto: {str(e)}")
+            
+            # Garantir que unidades_data seja uma lista
+            if isinstance(unidades_data, dict):
+                unidades_data = [unidades_data]
+            elif not isinstance(unidades_data, list):
+                logger.error(f"unidades_data não é uma lista nem um dicionário: {type(unidades_data)}")
+                unidades_data = []
             
             # Dados do formulário para salvar
             form_data = {
