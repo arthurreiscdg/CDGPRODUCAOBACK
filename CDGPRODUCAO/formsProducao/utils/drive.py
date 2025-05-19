@@ -16,33 +16,49 @@ class GoogleDriveService:
         self.credentials = None
         self.service = None
         self.initialize_service()
-
+        
     def initialize_service(self):
         """
-        Inicializa o serviço do Google Drive usando o arquivo de credenciais.
+        Inicializa o serviço do Google Drive usando as credenciais do arquivo .env.
         """
         try:
-            # Caminho para o arquivo de credenciais do serviço do Google Drive
-            credentials_path = os.path.join(settings.BASE_DIR, 'credentials', 'google_drive_credentials.json')
-            
-            # Verifica se o arquivo de credenciais existe
-            if not os.path.exists(credentials_path):
-                logger.error(f"Arquivo de credenciais não encontrado em: {credentials_path}")
-                return
-            
             # Escopo necessário para acesso ao Drive
             SCOPES = ['https://www.googleapis.com/auth/drive']
             
-            # Carrega as credenciais
-            self.credentials = service_account.Credentials.from_service_account_file(
-                credentials_path, scopes=SCOPES)
+            # Cria o dict de credenciais a partir das variáveis de ambiente
+            credentials_dict = {
+                "type": os.environ.get("GOOGLE_SERVICE_ACCOUNT_TYPE"),
+                "project_id": os.environ.get("GOOGLE_PROJECT_ID"),
+                "private_key_id": os.environ.get("GOOGLE_PRIVATE_KEY_ID"),
+                "private_key": os.environ.get("GOOGLE_PRIVATE_KEY").replace('\\n', '\n'),
+                "client_email": os.environ.get("GOOGLE_CLIENT_EMAIL"),
+                "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+                "auth_uri": os.environ.get("GOOGLE_AUTH_URI"),
+                "token_uri": os.environ.get("GOOGLE_TOKEN_URI"),
+                "auth_provider_x509_cert_url": os.environ.get("GOOGLE_AUTH_PROVIDER_X509_CERT_URL"),
+                "client_x509_cert_url": os.environ.get("GOOGLE_CLIENT_X509_CERT_URL"),
+                "universe_domain": os.environ.get("GOOGLE_UNIVERSE_DOMAIN")
+            }
+            
+            # Log para verificar se as credenciais estão sendo carregadas corretamente
+            if not credentials_dict["private_key"] or not credentials_dict["client_email"]:
+                logger.error("Credenciais do Google Drive não foram carregadas corretamente do arquivo .env")
+                logger.error(f"Private Key disponível: {'Sim' if credentials_dict['private_key'] else 'Não'}")
+                logger.error(f"Client Email disponível: {'Sim' if credentials_dict['client_email'] else 'Não'}")
+                return
+                
+            # Carrega as credenciais a partir do dicionário
+            self.credentials = service_account.Credentials.from_service_account_info(
+                credentials_dict, scopes=SCOPES)
                 
             # Constrói o serviço
             self.service = build('drive', 'v3', credentials=self.credentials)
             logger.info("Serviço do Google Drive inicializado com sucesso.")
         except Exception as e:
             logger.error(f"Erro ao inicializar o serviço do Google Drive: {str(e)}")
-            raise
+            # Detalhar o erro para facilitar o diagnóstico
+            import traceback
+            logger.error(traceback.format_exc())
 
     def upload_pdf(self, file_path, file_name, folder_id=None):
         """
@@ -64,6 +80,11 @@ class GoogleDriveService:
                     logger.error("Não foi possível inicializar o serviço do Google Drive.")
                     return None
             
+            # Verifica se o arquivo existe
+            if not os.path.exists(file_path):
+                logger.error(f"Arquivo não encontrado: {file_path}")
+                return None
+                
             file_metadata = {
                 'name': file_name,
                 'mimeType': 'application/pdf',
@@ -75,30 +96,44 @@ class GoogleDriveService:
             
             # Cria MediaFileUpload para o arquivo
             media = MediaFileUpload(file_path, mimetype='application/pdf', resumable=True)
-            
-            # Cria o arquivo no Google Drive
+              # Cria o arquivo no Google Drive
             file = self.service.files().create(
                 body=file_metadata,
                 media_body=media,
-                fields='id, webViewLink'
+                fields='id, webViewLink, webContentLink'
             ).execute()
             
-            logger.info(f"Arquivo {file_name} enviado com sucesso para o Google Drive. ID: {file.get('id')}")
+            file_id = file.get('id')
+            logger.info(f"Arquivo {file_name} enviado com sucesso para o Google Drive. ID: {file_id}")
             
             # Configura permissões para tornar o arquivo acessível por link
             self.service.permissions().create(
-                fileId=file.get('id'),
+                fileId=file_id,
                 body={'type': 'anyone', 'role': 'reader'},
                 fields='id'
             ).execute()
+              # Obter o link de download direto - formato alternativo caso webContentLink não esteja disponível
+            download_link = file.get('webContentLink')
+            if not download_link:
+                # Criando link de download manualmente no formato esperado pelo Google Drive
+                download_link = f"https://drive.google.com/uc?export=download&id={file_id}"
             
+            # Também podemos criar links alternativos para garantir o funcionamento
+            alt_download_link = f"https://drive.google.com/uc?export=download&id={file_id}"
+                
+            logger.info(f"Link de download gerado: {download_link}")
+            logger.info(f"Link alternativo: {alt_download_link}")
+                
             return {
-                'file_id': file.get('id'),
-                'web_link': file.get('webViewLink')
+                'file_id': file_id,
+                'web_link': file.get('webViewLink'),
+                'download_link': alt_download_link  # Usando o formato alternativo que é mais confiável
             }
         
         except Exception as e:
             logger.error(f"Erro ao fazer upload do arquivo para o Google Drive: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
 
     def get_folders(self, parent_id=None):

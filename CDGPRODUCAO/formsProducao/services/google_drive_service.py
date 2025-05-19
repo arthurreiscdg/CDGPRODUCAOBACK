@@ -88,7 +88,6 @@ class BaseFormularioGoogleDriveService(FormularioService):
                 cod_op=cod_op,
                 usuario=usuario  # Associa o usuário ao formulário
             )
-            
             # Se tiver um arquivo PDF, processa-o
             if arquivo_pdf:
                 nome_arquivo = f"{cls.PASTA_NOME}_{cod_op}.pdf"
@@ -100,8 +99,7 @@ class BaseFormularioGoogleDriveService(FormularioService):
                     # Configura a pasta no Google Drive se necessário
                     if cls.PASTA_ID is None:
                         cls.setup_pasta_drive()
-                        
-                    # Faz upload para o Google Drive
+                          # Faz upload para o Google Drive
                     drive_service = GoogleDriveService()
                     resultado_upload = drive_service.upload_pdf(
                         caminho_local, 
@@ -109,23 +107,32 @@ class BaseFormularioGoogleDriveService(FormularioService):
                         cls.PASTA_ID
                     )
                     
-                    # Se o upload for bem-sucedido, atualiza o formulário
-                    if resultado_upload:
-                        formulario.link_download = resultado_upload.get('web_link')
+                    # Log do resultado do upload para diagnóstico
+                    logger.info(f"Resultado do upload para o Google Drive: {resultado_upload}")
+                    
+                    # Se o upload para o Google Drive falhar, exclua o formulário e retorne None
+                    if not resultado_upload:
+                        logger.error(f"Falha ao fazer upload para o Google Drive. Excluindo formulário {cod_op}")
+                        formulario.delete()
+                        return None
                         
-                        # Cria um JSON com os detalhes do formulário
-                        dados_json = {
-                            'cod_op': cod_op,
-                            'nome': dados_form.get('nome'),
-                            'email': dados_form.get('email'),
-                            'unidade': dados_form.get('unidade_nome'),
-                            'titulo': dados_form.get('titulo'),
-                            'data_entrega': str(dados_form.get('data_entrega')),
-                            'link_pdf': resultado_upload.get('web_link')
-                        }
-                        
-                        formulario.json_link = json.dumps(dados_json)
-                        formulario.save()
+                    # Se o upload for bem-sucedido, atualiza o formulário com o link de download
+                    download_link = resultado_upload.get('download_link')
+                    logger.info(f"Link de download: {download_link}")
+                    formulario.link_download = download_link  # Usando o link de download direto
+                      # Cria um JSON com os detalhes do formulário
+                    dados_json = {
+                        'cod_op': cod_op,
+                        'nome': dados_form.get('nome'),
+                        'email': dados_form.get('email'),
+                        'unidade': dados_form.get('unidade_nome'),
+                        'titulo': dados_form.get('titulo'),
+                        'data_entrega': str(dados_form.get('data_entrega')),
+                        'link_pdf': download_link  # Usando a mesma variável de download_link já verificada
+                    }
+                    
+                    formulario.json_link = json.dumps(dados_json)
+                    formulario.save()
                         
                     # Remove o arquivo temporário
                     if os.path.exists(caminho_local):
@@ -167,32 +174,37 @@ class BaseFormularioGoogleDriveService(FormularioService):
                 if caminho_local:
                     # Configura a pasta no Google Drive se necessário
                     if cls.PASTA_ID is None:
-                        cls.setup_pasta_drive()
-                        
-                    # Faz upload para o Google Drive
+                        cls.setup_pasta_drive()                    # Faz upload para o Google Drive
                     drive_service = GoogleDriveService()
                     resultado_upload = drive_service.upload_pdf(
                         caminho_local, 
                         nome_arquivo,
                         cls.PASTA_ID
                     )
+                      # Log do resultado do upload para diagnóstico
+                    logger.info(f"Resultado do upload para o Google Drive na atualização: {resultado_upload}")
                     
-                    # Se o upload for bem-sucedido, atualiza o formulário
-                    if resultado_upload:
-                        formulario.link_download = resultado_upload.get('web_link')
-                        
-                        # Atualiza o JSON com os detalhes do formulário
-                        dados_json = {
-                            'cod_op': formulario.cod_op,
-                            'nome': formulario.nome,
-                            'email': formulario.email,
-                            'unidade': formulario.unidade_nome,
-                            'titulo': formulario.titulo,
-                            'data_entrega': str(formulario.data_entrega),
-                            'link_pdf': resultado_upload.get('web_link')
-                        }
-                        
-                        formulario.json_link = json.dumps(dados_json)
+                    # Se o upload falhar, não atualize o formulário e registre o erro
+                    if not resultado_upload:
+                        logger.error(f"Falha ao fazer upload do PDF para o Google Drive. Formulário {formulario.cod_op} não foi atualizado.")
+                        return formulario
+                    
+                    # Se o upload for bem-sucedido, atualiza o formulário com o link de download
+                    download_link = resultado_upload.get('download_link')
+                    logger.info(f"Link de download na atualização: {download_link}")
+                    formulario.link_download = download_link
+                          # Atualiza o JSON com os detalhes do formulário
+                    dados_json = {
+                        'cod_op': formulario.cod_op,
+                        'nome': formulario.nome,
+                        'email': formulario.email,
+                        'unidade': formulario.unidade_nome,
+                        'titulo': formulario.titulo,
+                        'data_entrega': str(formulario.data_entrega),
+                        'link_pdf': download_link  # Usando a mesma variável de download_link já verificada
+                    }
+                    
+                    formulario.json_link = json.dumps(dados_json)
                         
                     # Remove o arquivo temporário
                     if os.path.exists(caminho_local):
