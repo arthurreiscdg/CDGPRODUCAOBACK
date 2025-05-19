@@ -96,7 +96,7 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
                         
                         # Log do resultado do upload
                         logger.info(f"Resultado do upload para o Google Drive: {resultado_upload}")
-                          if resultado_upload:
+                        if resultado_upload:
                             # Atualiza o formulário com os links
                             download_link = resultado_upload.get('download_link')
                             web_view_link = resultado_upload.get('web_link')
