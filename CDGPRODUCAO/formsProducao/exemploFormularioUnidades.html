@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulário com Unidades Múltiplas</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        input[type="date"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        .btn-success {
+            background-color: #2ecc71;
+        }
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        .unidades-container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .unidade-item {
+            border: 1px solid #eee;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            position: relative;
+        }
+        .unidade-remover {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            line-height: 25px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Formulário de Pedido - ZeroHum</h1>
+        
+        <form id="formulario-zerohum">
+            <!-- Seção Dados do Cliente -->
+            <h2>Dados do Cliente</h2>
+            <div class="form-group">
+                <label for="nome">Nome Completo</label>
+                <input type="text" id="nome" name="nome" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">E-mail</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            
+            <!-- Seção Unidades -->
+            <h2>Unidades</h2>
+            <p>Adicione uma ou mais unidades e suas respectivas quantidades:</p>
+            
+            <div id="unidades-container" class="unidades-container">
+                <!-- As unidades serão adicionadas aqui dinamicamente -->
+            </div>
+            
+            <button type="button" id="adicionar-unidade" class="btn">+ Adicionar Unidade</button>
+            
+            <!-- Seção Dados do Documento -->
+            <h2>Dados do Documento</h2>
+            
+            <div class="form-group">
+                <label for="titulo">Título do Documento</label>
+                <input type="text" id="titulo" name="titulo" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="data_entrega">Data de Entrega</label>
+                <input type="date" id="data_entrega" name="data_entrega" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="formato">Formato</label>
+                <select id="formato" name="formato" required>
+                    <option value="A4">A4</option>
+                    <option value="A5">A5</option>
+                    <option value="A3">A3</option>
+                    <option value="CARTA">Carta</option>
+                    <option value="OFICIO">Ofício</option>
+                    <option value="OUTRO">Outro</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="cor_impressao">Cor da Impressão</label>
+                <select id="cor_impressao" name="cor_impressao" required>
+                    <option value="PB">Preto e Branco</option>
+                    <option value="COLOR">Colorido</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="impressao">Tipo de Impressão</label>
+                <select id="impressao" name="impressao" required>
+                    <option value="1_LADO">Somente Frente</option>
+                    <option value="2_LADOS">Frente e Verso</option>
+                    <option value="LIVRETO">Livreto</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="observacoes">Observações</label>
+                <textarea id="observacoes" name="observacoes" rows="4"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="arquivo">Arquivo PDF</label>
+                <input type="file" id="arquivo" name="arquivo" accept=".pdf" required>
+            </div>
+            
+            <div class="actions">
+                <button type="button" class="btn btn-danger" onclick="limparFormulario()">Limpar</button>
+                <button type="submit" class="btn btn-success">Enviar Pedido</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Adicionar primeira unidade automaticamente ao carregar a página
+            adicionarUnidade();
+            
+            // Configurar botão para adicionar mais unidades
+            document.getElementById('adicionar-unidade').addEventListener('click', adicionarUnidade);
+            
+            // Configurar envio do formulário
+            document.getElementById('formulario-zerohum').addEventListener('submit', enviarFormulario);
+        });
+        
+        let contadorUnidades = 0;
+        
+        function adicionarUnidade() {
+            contadorUnidades++;
+            
+            const unidadesContainer = document.getElementById('unidades-container');
+            const novUnidade = document.createElement('div');
+            novUnidade.className = 'unidade-item';
+            novUnidade.dataset.id = contadorUnidades;
+              novUnidade.innerHTML = `
+                <button type="button" class="unidade-remover" onclick="removerUnidade(${contadorUnidades})">×</button>
+                <div class="form-group">
+                    <label for="unidade_nome_${contadorUnidades}">Nome da Unidade</label>
+                    <select id="unidade_nome_${contadorUnidades}" name="unidade_nome_${contadorUnidades}" required>
+                        <option value="">Selecione uma unidade...</option>
+                        <option value="ARARUAMA">Araruama</option>
+                        <option value="CABO_FRIO">Cabo Frio</option>
+                        <option value="ITABORAI">Itaboraí</option>
+                        <option value="ITAIPUACU">Itaipuaçu</option>
+                        <option value="MARICA_I">Maricá I</option>
+                        <option value="NOVA_FRIBURGO">Nova Friburgo</option>
+                        <option value="QUEIMADOS">Queimados</option>
+                        <option value="SEROPEDICA">Seropédica</option>
+                        <option value="ALCANTARA">Alcântara</option>
+                        <option value="BANGU">Bangu</option>
+                        <option value="BARRA_DA_TIJUCA">Barra da Tijuca</option>
+                        <option value="BELFORD_ROXO">Belford Roxo</option>
+                        <option value="DUQUE_DE_CAXIAS">Duque de Caxias</option>
+                        <option value="ICARAI">Icaraí</option>
+                        <option value="ILHA_DO_GOVERNADOR">Ilha do Governador</option>
+                        <option value="ITAIPU">Itaipu</option>
+                        <option value="MADUREIRA">Madureira</option>
+                        <option value="MEIER">Méier</option>
+                        <option value="NILOPOLIS">Nilópolis</option>
+                        <option value="NITEROI">Niterói</option>
+                        <option value="NOVA_IGUACU">Nova Iguaçu</option>
+                        <option value="OLARIA">Olaria</option>
+                        <option value="PRATA">Prata</option>
+                        <option value="SAO_GONCALO">São Gonçalo</option>
+                        <option value="SAO_JOAO_DE_MERITI">São João de Meriti</option>
+                        <option value="VILA_ISABEL">Vila Isabel</option>
+                        <option value="VILAR_DOS_TELES">Vilar dos Teles</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="unidade_quantidade_${contadorUnidades}">Quantidade</label>
+                    <input type="number" id="unidade_quantidade_${contadorUnidades}" name="unidade_quantidade_${contadorUnidades}" min="1" value="1" required>
+                </div>
+            `;
+            
+            unidadesContainer.appendChild(novUnidade);
+        }
+        
+        function removerUnidade(id) {
+            const unidade = document.querySelector(`.unidade-item[data-id="${id}"]`);
+            
+            // Verificar se existe mais de uma unidade antes de remover
+            const unidades = document.querySelectorAll('.unidade-item');
+            if (unidades.length > 1) {
+                unidade.remove();
+            } else {
+                alert('É necessário pelo menos uma unidade!');
+            }
+        }
+        
+        function limparFormulario() {
+            if (confirm('Tem certeza que deseja limpar o formulário?')) {
+                document.getElementById('formulario-zerohum').reset();
+                
+                // Remover todas as unidades e adicionar uma nova
+                const unidadesContainer = document.getElementById('unidades-container');
+                unidadesContainer.innerHTML = '';
+                contadorUnidades = 0;
+                adicionarUnidade();
+            }
+        }
+        
+        function enviarFormulario(event) {
+            event.preventDefault();
+            
+            // Coletar dados do formulário
+            const formData = new FormData(document.getElementById('formulario-zerohum'));
+            
+            // Coletar dados das unidades
+            const unidades = [];
+            document.querySelectorAll('.unidade-item').forEach(unidade => {
+                const id = unidade.dataset.id;
+                const nome = document.getElementById(`unidade_nome_${id}`).value;
+                const quantidade = document.getElementById(`unidade_quantidade_${id}`).value;
+                
+                unidades.push({
+                    nome: nome,
+                    quantidade: parseInt(quantidade)
+                });
+            });
+              // Criar objeto de dados para enviar
+            const jsonData = {
+                nome: formData.get('nome'),
+                email: formData.get('email'),
+                titulo: formData.get('titulo'),
+                data_entrega: formData.get('data_entrega'),
+                formato: formData.get('formato'),
+                cor_impressao: formData.get('cor_impressao'),
+                impressao: formData.get('impressao'),
+                observacoes: formData.get('observacoes'),
+                unidades: unidades
+            };
+            
+            console.log('Dados a serem enviados:', jsonData);
+            
+            // Preparar dados para envio (incluindo o arquivo)
+            const dadosEnvio = new FormData();
+            
+            // Adicionar dados JSON
+            dadosEnvio.append('dados', JSON.stringify(jsonData));
+            
+            // Também adicionar as unidades como um campo separado para garantir
+            dadosEnvio.append('unidades', JSON.stringify(unidades));
+            
+            // Adicionar arquivo
+            dadosEnvio.append('arquivo', formData.get('arquivo'));
+            
+            // Configuração da requisição AJAX
+            fetch('/api/formularios/zerohum/', {
+                method: 'POST',
+                body: dadosEnvio
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao enviar formulário');
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('Formulário enviado com sucesso! Código OP: ' + data.cod_op);
+                limparFormulario();
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao enviar formulário. Por favor, tente novamente.');
+            });
+        }
+    </script>
+</body>
+</html>

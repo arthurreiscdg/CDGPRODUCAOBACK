@@ -12,7 +12,6 @@ class ZeroHumSerializer(FormularioBaseSerializer):
     class Meta(FormularioBaseSerializer.Meta):
         # Podemos customizar campos específicos aqui
         pass
-        
     def validate(self, data):
         """
         Validações específicas para o formulário ZeroHum.
@@ -22,6 +21,7 @@ class ZeroHumSerializer(FormularioBaseSerializer):
         
         # Validações específicas podem ser adicionadas aqui
         logger.debug(f"Validando dados do ZeroHum: {data}")
+        logger.debug(f"Chaves disponíveis: {data.keys()}")
         
         # Por exemplo, verificar se todos os campos obrigatórios específicos do ZeroHum estão preenchidos
         required_fields = ['nome', 'email', 'titulo', 'data_entrega']
@@ -34,7 +34,19 @@ class ZeroHumSerializer(FormularioBaseSerializer):
         unidades = data.get('unidades', [])
         logger.debug(f"Unidades no validate: {unidades}, tipo: {type(unidades)}")
         
+        # Verificar se unidades é uma string e tentar converter
+        if isinstance(unidades, str):
+            try:
+                import json
+                unidades = json.loads(unidades)
+                data['unidades'] = unidades
+                logger.debug(f"Unidades convertidas de string para objeto: {unidades}")
+            except Exception as e:
+                logger.error(f"Erro ao converter unidades de string para objeto: {str(e)}")
+        
         if not unidades or len(unidades) == 0:
+            # Se não tem unidades, verificar se há campos 'unidade_nome_X' e 'unidade_quantidade_X' na requisição original
+            logger.warning("Nenhuma unidade foi encontrada no campo unidades.")
             raise serializers.ValidationError("É necessário informar pelo menos uma unidade.")
         
         # Verificar se cada unidade tem nome e quantidade válida

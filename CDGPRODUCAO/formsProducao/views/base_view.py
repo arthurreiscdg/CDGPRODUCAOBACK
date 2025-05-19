@@ -37,9 +37,31 @@ class BaseFormularioView(APIView):
             
             # Obtenha o usuário atual (se autenticado)
             usuario_atual = request.user if request.user.is_authenticated else None
-            logger.debug(f"Usuário atual: {usuario_atual}")
-              # Processar dados da requisição
+            logger.debug(f"Usuário atual: {usuario_atual}")            # Processar dados da requisição
             dados_requisicao = request.data.copy()
+              # Verificar se os dados foram enviados em um campo 'dados' (formato JSON)
+            # Este é o formato usado pelo formulário HTML
+            if 'dados' in dados_requisicao:
+                try:
+                    import json
+                    dados_json = json.loads(dados_requisicao['dados'])
+                    logger.debug(f"Dados extraídos do campo 'dados': {dados_json}")
+                    
+                    # Verificar e garantir que as unidades sejam extraídas corretamente
+                    if 'unidades' in dados_json:
+                        logger.debug(f"Unidades encontradas no campo 'dados': {dados_json['unidades']}")
+                        # Garantir que as unidades sejam passadas como uma lista de dicionários
+                        dados_requisicao['unidades'] = dados_json['unidades']
+                    
+                    # Mesclar os dados JSON com os demais campos na requisição
+                    for key, value in dados_json.items():
+                        if key != 'arquivo' and key != 'unidades':  # Já tratamos as unidades separadamente
+                            dados_requisicao[key] = value
+                    
+                    # Remover o campo 'dados' após extrair seu conteúdo
+                    del dados_requisicao['dados']
+                except Exception as e:
+                    logger.error(f"Erro ao processar o campo 'dados': {str(e)}")
             
             # Tratar unidades enviadas em formato de form-data
             unidades = []
@@ -79,8 +101,7 @@ class BaseFormularioView(APIView):
             
             # Log das unidades processadas
             logger.debug(f"Unidades processadas do form-data: {unidades}")
-            
-            # Adicionar as unidades processadas ao request data
+              # Adicionar as unidades processadas ao request data
             if unidades:
                 dados_requisicao['unidades'] = unidades
             
@@ -94,6 +115,11 @@ class BaseFormularioView(APIView):
                 except Exception as e:
                     logger.error(f"Erro ao processar unidades JSON: {str(e)}")
                     # Não retornar erro, pois já temos as unidades processadas do form-data
+            
+            # Log para diagnóstico
+            logger.debug(f"Dados processados antes da validação: {dados_requisicao}")
+            if 'unidades' in dados_requisicao:
+                logger.debug(f"Unidades após processamento: {dados_requisicao['unidades']}, tipo: {type(dados_requisicao['unidades'])}")
             
             # Processa primeiro os dados do formulário
             serializer = self.serializer_class(data=dados_requisicao)

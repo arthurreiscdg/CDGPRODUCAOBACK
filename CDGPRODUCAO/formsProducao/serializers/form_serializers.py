@@ -30,6 +30,27 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('cod_op', 'link_download', 'web_view_link', 'json_link', 'criado_em', 'atualizado_em', 'usuario_info')
     
+    def to_internal_value(self, data):
+        """
+        Pré-processamento dos dados antes da validação.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Log dos dados recebidos
+        logger.debug(f"to_internal_value recebeu: {data}")
+        
+        # Verificar se as unidades estão em formato string e converter para lista
+        if 'unidades' in data and isinstance(data['unidades'], str):
+            import json
+            try:
+                data['unidades'] = json.loads(data['unidades'])
+                logger.debug(f"Unidades convertidas de string para objeto: {data['unidades']}")
+            except Exception as e:
+                logger.error(f"Erro ao converter unidades de string para objeto: {str(e)}")
+        
+        return super().to_internal_value(data)
+    
     def create(self, validated_data):
         # Extrair as unidades dos dados validados
         unidades_data = validated_data.pop('unidades', [])
