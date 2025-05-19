@@ -115,11 +115,21 @@ class BaseFormularioView(APIView):
                 except Exception as e:
                     logger.error(f"Erro ao processar unidades JSON: {str(e)}")
                     # Não retornar erro, pois já temos as unidades processadas do form-data
-            
-            # Log para diagnóstico
+              # Log para diagnóstico
             logger.debug(f"Dados processados antes da validação: {dados_requisicao}")
             if 'unidades' in dados_requisicao:
                 logger.debug(f"Unidades após processamento: {dados_requisicao['unidades']}, tipo: {type(dados_requisicao['unidades'])}")
+            else:
+                logger.warning("NENHUMA UNIDADE ENCONTRADA NO REQUEST DATA APÓS PROCESSAMENTO!")
+                # Verificar se há alguma evidência de unidades no request original
+                unidade_evidencias = [k for k in request.data.keys() if 'unidade' in k.lower() or 'quantidade' in k.lower()]
+                if unidade_evidencias:
+                    logger.warning(f"Encontradas possíveis evidências de unidades não processadas: {unidade_evidencias}")
+            
+            # Verificar se a URL está correta
+            logger.debug(f"URL da requisição: {request.path}")
+            logger.debug(f"Método da requisição: {request.method}")
+            logger.debug(f"Content-Type: {request.content_type}")
             
             # Processa primeiro os dados do formulário
             serializer = self.serializer_class(data=dados_requisicao)
