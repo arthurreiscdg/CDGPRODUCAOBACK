@@ -1,5 +1,3 @@
-
-
 import logging
 import os
 import uuid
@@ -8,6 +6,8 @@ from django.conf import settings
 from django.utils import timezone
 from formsProducao.services.google_drive_service import BaseFormularioGoogleDriveService
 from formsProducao.models.formulario import Formulario
+from formsProducao.models.unidade import Unidade
+from formsProducao.utils.drive import GoogleDriveService
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,8 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
         Returns:
             Formulario: Objeto do formulário criado e processado
         """
-        try:            # Durante o desenvolvimento, se não houver credenciais do Google Drive,
+        try:
+            # Durante o desenvolvimento, se não houver credenciais do Google Drive,
             # podemos salvar os arquivos localmente
             # Verifica se existe o arquivo de credenciais ou se as variáveis de ambiente estão configuradas
             existe_arquivo_credenciais = os.path.exists(os.path.join(settings.BASE_DIR, 'credentials', 'google_drive_credentials.json'))
@@ -42,31 +43,32 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
             logger.info(f"Modo de desenvolvimento local: {desenvolvimento_local}")
             
             # Gera um código de operação único
-            cod_op = cls.gerar_cod_op()            # Extrair as unidades dos dados do formulário
+            cod_op = cls.gerar_cod_op()
+            
+            # Extrair as unidades dos dados do formulário
             unidades_data = dados_form.pop('unidades', [])
             logger.info(f"Tipo de unidades_data: {type(unidades_data)}")
             logger.info(f"Unidades recebidas: {unidades_data}")
             
             # Se não houver unidades, verificar se foi um erro de processamento
             if not unidades_data:
-                logger.warning("Nenhuma unidade encontrada nos dados validados")
-                logger.debug(f"Dados completos recebidos: {dados_form}")
+                logger.warning("Nenhuma unidade encontrada nos dados do formulário")
             
             # Se unidades_data for uma string, tentar converter para lista
             if isinstance(unidades_data, str):
                 try:
-                    import json
                     unidades_data = json.loads(unidades_data)
-                    logger.info(f"Unidades convertidas de JSON para objeto: {unidades_data}")
+                    logger.info(f"Unidades convertidas de string JSON: {unidades_data}")
                 except Exception as e:
-                    logger.error(f"Erro ao converter unidades de JSON para objeto: {str(e)}")
+                    logger.error(f"Erro ao converter unidades de string JSON: {e}")
             
             # Garantir que unidades_data seja uma lista
             if isinstance(unidades_data, dict):
                 unidades_data = [unidades_data]
+                logger.info("Convertido objeto de unidades de dict para lista")
             elif not isinstance(unidades_data, list):
-                logger.error(f"unidades_data não é uma lista nem um dicionário: {type(unidades_data)}")
                 unidades_data = []
+                logger.warning("Unidades não é uma lista nem pode ser convertida para uma")
             
             # Dados do formulário para salvar
             form_data = {
@@ -74,101 +76,81 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
                 'cod_op': cod_op
             }
             
-            # Se estivermos em modo de desenvolvimento local
-            if desenvolvimento_local and arquivo_pdf:
-                # Cria a pasta de mídia se não existir
-                media_dir = os.path.join(settings.MEDIA_ROOT, 'pdfs')
-                if not os.path.exists(media_dir):
-                    os.makedirs(media_dir)
+            # Caminho para salvar e link de download/visualização, inicialmente vazios
+            link_download = None
+            web_view_link = None
+            json_link = None
+            
+            # Processar o upload do arquivo PDF para o Google Drive
+            if arquivo_pdf:
+                # Nome do arquivo para upload
+                nome_arquivo = f"ZeroHum_{cod_op}.pdf"
                 
-                # Gera um nome de arquivo único
-                nome_arquivo = f"{cls.PREFIXO_COD_OP}_{cod_op}.pdf"
-                caminho_arquivo = os.path.join(media_dir, nome_arquivo)
+                # Caminho temporário para salvar o PDF antes de enviar ao Drive
+                temp_file_path = os.path.join(settings.BASE_DIR, 'temp', nome_arquivo)
+                os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
                 
-                # Salva o arquivo PDF
-                with open(caminho_arquivo, 'wb') as f:
-                    f.write(arquivo_pdf)
+                # Salvar arquivo temporariamente
+                with open(temp_file_path, 'wb') as f:
+                    f.write(arquivo_pdf.read() if hasattr(arquivo_pdf, 'read') else arquivo_pdf)
                 
-                # Define o link local
-                form_data['link_download'] = f"/media/pdfs/{nome_arquivo}"
-                form_data['arquivo'] = f"pdfs/{nome_arquivo}"              # Cria o formulário no banco de dados, incluindo o usuário que enviou
+                # Se estivermos em modo desenvolvimento e não temos acesso ao Google Drive
+                if desenvolvimento_local:
+                    # Salvamos apenas localmente
+                    form_data['arquivo'] = arquivo_pdf
+                    form_data['link_download'] = f"/media/pdfs/{nome_arquivo}"
+                    form_data['web_view_link'] = f"/media/pdfs/{nome_arquivo}"
+                    logger.info(f"Arquivo salvo localmente em: {temp_file_path}")
+                else:
+                    # Inicializa o serviço do Google Drive
+                    drive_service = GoogleDriveService()
+                    
+                    # Configurar a pasta no Google Drive se necessário
+                    if cls.PASTA_ID is None:
+                        cls.setup_pasta_drive()
+                    
+                    # Fazer upload do arquivo para o Google Drive
+                    resultado_upload = drive_service.upload_pdf(
+                        file_path=temp_file_path, 
+                        file_name=nome_arquivo,
+                        folder_id=cls.PASTA_ID
+                    )
+                    
+                    if resultado_upload:
+                        # Obter links do resultado do upload
+                        file_id = resultado_upload.get('file_id')
+                        web_view_link = resultado_upload.get('web_link')
+                        link_download = resultado_upload.get('download_link')
+                        
+                        # Atualizar os dados do formulário com os links
+                        form_data['link_download'] = link_download
+                        form_data['web_view_link'] = web_view_link
+                        
+                        logger.info(f"Arquivo enviado para o Google Drive com sucesso. ID: {file_id}")
+                        logger.info(f"Link de visualização: {web_view_link}")
+                        logger.info(f"Link de download: {link_download}")
+                    else:
+                        logger.error("Falha ao fazer upload do arquivo para o Google Drive")
+            
+            # Criar o formulário no banco de dados
             formulario = Formulario.objects.create(
                 **form_data,
                 usuario=usuario
             )
             
-            # Cria as unidades relacionadas ao formulário
-            from formsProducao.models.unidade import Unidade
+            # Criar as unidades relacionadas ao formulário
             for unidade_data in unidades_data:
-                Unidade.objects.create(
-                    formulario=formulario,
-                    nome=unidade_data['nome'],
-                    quantidade=unidade_data['quantidade']
-                )
-              # Se não estiver em desenvolvimento local, tenta fazer upload para o Google Drive
-            if not desenvolvimento_local and arquivo_pdf:
-                try:
-                    # Salva o arquivo temporariamente para fazer o upload
-                    nome_arquivo = f"{cls.PASTA_NOME}_{cod_op}.pdf"
-                    caminho_local = cls.salvar_pdf_local(arquivo_pdf, nome_arquivo)
-                    
-                    if caminho_local:
-                        # Configura a pasta no Google Drive se necessário
-                        if cls.PASTA_ID is None:
-                            cls.setup_pasta_drive()
-                            
-                        # Faz upload para o Google Drive
-                        from formsProducao.utils.drive import GoogleDriveService
-                        drive_service = GoogleDriveService()
-                        resultado_upload = drive_service.upload_pdf(
-                            caminho_local, 
-                            nome_arquivo,
-                            cls.PASTA_ID
-                        )
-                        
-                        # Log do resultado do upload
-                        logger.info(f"Resultado do upload para o Google Drive: {resultado_upload}")
-                        if resultado_upload:
-                            # Atualiza o formulário com os links
-                            download_link = resultado_upload.get('download_link')
-                            web_view_link = resultado_upload.get('web_link')
-                            logger.info(f"Link de download: {download_link}")
-                            logger.info(f"Link de visualização: {web_view_link}")
-                            formulario.link_download = download_link
-                            formulario.web_view_link = web_view_link
-                              # Obtém as unidades relacionadas a este formulário
-                            unidades = formulario.unidades.all()
-                            unidades_json = []
-                            for unidade in unidades:
-                                unidades_json.append({
-                                    'nome': unidade.nome,
-                                    'quantidade': unidade.quantidade
-                                })
-                            
-                            # Cria um JSON com os detalhes do formulário
-                            dados_json = {
-                                'cod_op': cod_op,
-                                'nome': dados_form.get('nome'),
-                                'email': dados_form.get('email'),
-                                'unidades': unidades_json,
-                                'titulo': dados_form.get('titulo'),
-                                'data_entrega': str(dados_form.get('data_entrega')),
-                                'link_pdf': download_link,
-                                'link_visualizacao': web_view_link
-                            }
-                            
-                            formulario.json_link = json.dumps(dados_json)
-                            formulario.save()
-                            
-                        # Remove o arquivo temporário
-                        if os.path.exists(caminho_local):
-                            os.remove(caminho_local)
-                except Exception as e:
-                    logger.error(f"Erro ao fazer upload para o Google Drive: {str(e)}")
-                    # Mas não falha se o upload não funcionar, já que o arquivo já foi salvo localmente
-            
+                if isinstance(unidade_data, dict):
+                    Unidade.objects.create(
+                        formulario=formulario,
+                        nome=unidade_data.get('nome'),
+                        quantidade=unidade_data.get('quantidade', 1)
+                    )
+                
             return formulario
                 
         except Exception as e:
             logger.error(f"Erro ao processar formulário ZeroHum: {str(e)}")
-            raise
+            import traceback
+            logger.error(traceback.format_exc())
+            raise e

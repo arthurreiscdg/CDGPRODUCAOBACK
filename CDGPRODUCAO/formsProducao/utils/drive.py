@@ -59,7 +59,7 @@ class GoogleDriveService:
             # Detalhar o erro para facilitar o diagnóstico
             import traceback
             logger.error(traceback.format_exc())
-
+            
     def upload_pdf(self, file_path, file_name, folder_id=None):
         """
         Faz upload de um arquivo PDF para o Google Drive.
@@ -79,11 +79,12 @@ class GoogleDriveService:
                 if not self.service:
                     logger.error("Não foi possível inicializar o serviço do Google Drive.")
                     return None
-            
-            # Verifica se o arquivo existe
+              # Verifica se o arquivo existe
             if not os.path.exists(file_path):
                 logger.error(f"Arquivo não encontrado: {file_path}")
                 return None
+            
+            logger.info(f"Iniciando upload do arquivo {file_name} para o Google Drive")
                 
             file_metadata = {
                 'name': file_name,

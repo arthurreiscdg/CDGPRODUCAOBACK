@@ -1,9 +1,9 @@
-
-
-
 from rest_framework import serializers
-from formsProducao.serializers.form_serializers import FormularioBaseSerializer
 import json
+import logging
+from formsProducao.serializers.form_serializers import FormularioBaseSerializer
+
+logger = logging.getLogger(__name__)
 
 class ZeroHumSerializer(FormularioBaseSerializer):
     """
@@ -17,10 +17,6 @@ class ZeroHumSerializer(FormularioBaseSerializer):
         """
         Validações específicas para o formulário ZeroHum.
         """
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        # Validações específicas podem ser adicionadas aqui
         logger.debug(f"Validando dados do ZeroHum: {data}")
         logger.debug(f"Chaves disponíveis: {data.keys()}")
         logger.debug(f"Dados completos recebidos na validação: {data}")
@@ -30,8 +26,8 @@ class ZeroHumSerializer(FormularioBaseSerializer):
         
         for field in required_fields:
             if field not in data or not data[field]:
-                logger.error(f"Campo obrigatório '{field}' ausente ou vazio")
-                raise serializers.ValidationError(f"O campo '{field}' é obrigatório para o formulário ZeroHum.")
+                raise serializers.ValidationError({field: f"O campo {field} é obrigatório."})
+        
         # Verificar se pelo menos uma unidade foi enviada
         unidades = data.get('unidades', [])
         logger.debug(f"Unidades no validate: {unidades}, tipo: {type(unidades)}")
@@ -50,18 +46,17 @@ class ZeroHumSerializer(FormularioBaseSerializer):
             # Procura por campos relacionados a unidades no request.data
             unidade_campos = [k for k in request.data.keys() if 'unidade' in k.lower()]
             if unidade_campos:
-                logger.debug(f"Campos relacionados a unidades encontrados: {unidade_campos}")
+                logger.debug(f"Campos de unidades encontrados na request: {unidade_campos}")
         else:
             logger.debug("Sem objeto request no contexto")
-          # Verificar se unidades é uma string e tentar converter
+        
+        # Verificar se unidades é uma string e tentar converter
         if isinstance(unidades, str):
             try:
-                import json
                 unidades = json.loads(unidades)
-                data['unidades'] = unidades
-                logger.debug(f"Unidades convertidas de string para objeto: {unidades}")
+                logger.debug(f"Unidades convertidas de string JSON: {unidades}")
             except Exception as e:
-                logger.error(f"Erro ao converter unidades de string para objeto: {str(e)}")
+                logger.error(f"Erro ao converter unidades de string JSON: {e}")
         
         if not unidades or len(unidades) == 0:
             # Se não tem unidades, verificar se há unidades em algum outro formato nos dados originais
@@ -70,53 +65,70 @@ class ZeroHumSerializer(FormularioBaseSerializer):
             # Verificar se há unidades no request original
             request = self.context.get('request')
             if request and hasattr(request, 'data'):
-                # Procurar por campos relacionados a unidades
-                unidade_keys = [k for k in request.data.keys() if k.startswith('unidades[')]
-                if unidade_keys:
-                    logger.info(f"Encontradas possíveis unidades em formato alternativo: {unidade_keys}")
+                # Procurar por campos no formato nome_0, quantidade_0, etc.
+                unidades_alternativas = []
+                i = 0
+                while f'nome_{i}' in request.data:
+                    nome = request.data.get(f'nome_{i}')
+                    quantidade = request.data.get(f'quantidade_{i}', 1)
                     
-                    # Tentar processar unidades direto da request
-                    unidades_temp = []
-                    indices_unidades = set()
-                    
-                    for key in unidade_keys:
-                        try:
-                            # Extrai o índice da unidade do formato unidades[0][nome]
-                            indice = int(key.split('[')[1].split(']')[0])
-                            indices_unidades.add(indice)
-                        except (IndexError, ValueError):
-                            continue
-                    
-                    for indice in indices_unidades:
-                        unidade = {}
-                        nome_key = f'unidades[{indice}][nome]'
-                        qtd_key = f'unidades[{indice}][quantidade]'
+                    try:
+                        quantidade = int(quantidade)
+                    except (ValueError, TypeError):
+                        quantidade = 1
                         
-                        if nome_key in request.data:
-                            unidade['nome'] = request.data[nome_key]
-                        if qtd_key in request.data:
-                            try:
-                                unidade['quantidade'] = int(request.data[qtd_key])
-                            except (TypeError, ValueError):
-                                unidade['quantidade'] = 1
-                        
-                        if unidade and unidade.get('nome'):
-                            unidades_temp.append(unidade)
+                    unidades_alternativas.append({
+                        'nome': nome,
+                        'quantidade': quantidade
+                    })
                     
-                    if unidades_temp:
-                        logger.info(f"Unidades processadas manualmente: {unidades_temp}")
-                        data['unidades'] = unidades_temp
-                        return data
+                    i += 1
+                
+                if unidades_alternativas:
+                    logger.debug(f"Unidades alternativas encontradas: {unidades_alternativas}")
+                    data['unidades'] = unidades_alternativas
+                    unidades = unidades_alternativas
             
             # Se chegou aqui, realmente não há unidades
-            raise serializers.ValidationError("É necessário informar pelo menos uma unidade.")
+            if not unidades or len(unidades) == 0:
+                raise serializers.ValidationError({
+                    "unidades": "Pelo menos uma unidade deve ser informada."
+                })
         
         # Verificar se cada unidade tem nome e quantidade válida
         for i, unidade in enumerate(unidades):
-            logger.debug(f"Validando unidade {i}: {unidade}")
-            if not unidade.get('nome'):
-                raise serializers.ValidationError(f"A unidade {i+1} precisa ter um nome.")
-            if not unidade.get('quantidade') or int(unidade.get('quantidade')) < 1:
-                raise serializers.ValidationError(f"A unidade {i+1} precisa ter uma quantidade válida (maior que zero).")
+            if not isinstance(unidade, dict):
+                raise serializers.ValidationError({
+                    "unidades": f"A unidade {i} está em formato inválido."
+                })
+                
+            # Validar nome da unidade
+            if 'nome' not in unidade or not unidade['nome']:
+                raise serializers.ValidationError({
+                    "unidades": f"O nome da unidade {i} é obrigatório."
+                })
+                
+            # Validar se é uma unidade válida (deve estar nos choices do modelo)
+            from formsProducao.models.unidade import Unidade
+            valid_choices = dict(Unidade.NOME_CHOICES).keys()
+            if unidade['nome'] not in valid_choices:
+                raise serializers.ValidationError({
+                    "unidades": f"'{unidade['nome']}' não é uma unidade válida. Escolha entre: {', '.join(valid_choices)}"
+                })
+            
+            # Validar quantidade
+            quantidade = unidade.get('quantidade', None)
+            try:
+                if quantidade is None:
+                    unidade['quantidade'] = 1
+                else:
+                    quantidade = int(quantidade)
+                    if quantidade <= 0:
+                        raise ValueError("A quantidade deve ser maior que zero.")
+                    unidade['quantidade'] = quantidade
+            except (ValueError, TypeError):
+                raise serializers.ValidationError({
+                    "unidades": f"A quantidade da unidade {i} deve ser um número inteiro positivo."
+                })
         
         return data

@@ -1,4 +1,6 @@
 from rest_framework import serializers
+import json
+import logging
 from formsProducao.models.formulario import Formulario
 from formsProducao.models.unidade import Unidade
 from formsProducao.serializers.unidade_serializers import UnidadeCreateSerializer, UnidadeSerializer
@@ -29,13 +31,12 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
         model = Formulario
         fields = '__all__'
         read_only_fields = ('cod_op', 'link_download', 'web_view_link', 'json_link', 'criado_em', 'atualizado_em', 'usuario_info')
+    
     def to_internal_value(self, data):
         """
         Pré-processamento dos dados antes da validação.
         """
-        import logging
         logger = logging.getLogger(__name__)
-        import json
         
         # Log dos dados recebidos
         logger.debug(f"to_internal_value recebeu: {data}")
@@ -45,53 +46,51 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
             # Caso 1: String JSON -> converter para lista de dicts
             if isinstance(data['unidades'], str):
                 try:
-                    data['unidades'] = json.loads(data['unidades'])
-                    logger.debug(f"Unidades convertidas de string JSON para objeto: {data['unidades']}")
+                    data = data.copy()  # Criar uma cópia para modificar
+                    unidades_json = json.loads(data['unidades'])
+                    data['unidades'] = unidades_json
+                    logger.debug(f"Convertidas unidades de string JSON: {unidades_json}")
                 except Exception as e:
-                    logger.error(f"Erro ao converter unidades de string para objeto: {str(e)}")
+                    logger.error(f"Erro ao converter unidades de string JSON: {e}")
             
-            # Caso 2: já é uma lista Python (quando enviado como JSON diretamente)
-            logger.debug(f"Tipo final das unidades: {type(data['unidades'])}")
-            logger.debug(f"Conteúdo das unidades após processamento: {data['unidades']}")
+            # Caso 2: Dict único -> converter para lista com um item
+            if isinstance(data['unidades'], dict):
+                data = data.copy()  # Criar uma cópia para modificar
+                data['unidades'] = [data['unidades']]
+                logger.debug("Convertido objeto de unidades de dict para lista")
         else:
-            # Caso 3: Procurar por campos de unidades no formato unidades[0][nome]
-            logger.debug("Campo 'unidades' não encontrado, procurando por formato alternativo")
-            unidade_keys = [k for k in data.keys() if k.startswith('unidades[')]
+            # Procurar por unidades em formato específico (nome_0, quantidade_0, nome_1, quantidade_1, etc.)
+            unidades_data = []
+            unidade_indices = set()
             
-            if unidade_keys:
-                logger.info(f"Encontradas unidades em formato alternativo: {unidade_keys}")
+            # Identificar quais índices de unidades estão presentes nos dados
+            for key in data.keys():
+                if key.startswith('nome_') and key[5:].isdigit():
+                    unidade_indices.add(int(key[5:]))
+            
+            # Construir a lista de unidades
+            for idx in sorted(unidade_indices):
+                nome_key = f'nome_{idx}'
+                quantidade_key = f'quantidade_{idx}'
                 
-                # Processar unidades do formato de FormData
-                unidades_temp = []
-                indices_unidades = set()
-                
-                for key in unidade_keys:
+                if nome_key in data:
+                    quantidade = data.get(quantidade_key, 1)
                     try:
-                        # Extrai o índice da unidade do formato unidades[0][nome]
-                        indice = int(key.split('[')[1].split(']')[0])
-                        indices_unidades.add(indice)
-                    except (IndexError, ValueError):
-                        continue
-                
-                for indice in sorted(indices_unidades):
-                    unidade = {}
-                    nome_key = f'unidades[{indice}][nome]'
-                    qtd_key = f'unidades[{indice}][quantidade]'
+                        # Tentar converter para inteiro, se não for possível, usar 1
+                        quantidade = int(quantidade)
+                    except (ValueError, TypeError):
+                        quantidade = 1
                     
-                    if nome_key in data:
-                        unidade['nome'] = data[nome_key]
-                    if qtd_key in data:
-                        try:
-                            unidade['quantidade'] = int(data[qtd_key])
-                        except (TypeError, ValueError):
-                            unidade['quantidade'] = 1
-                    
-                    if unidade and unidade.get('nome'):
-                        unidades_temp.append(unidade)
-                
-                if unidades_temp:
-                    logger.info(f"Unidades processadas do FormData: {unidades_temp}")
-                    data['unidades'] = unidades_temp
+                    unidades_data.append({
+                        'nome': data[nome_key],
+                        'quantidade': quantidade
+                    })
+            
+            # Se encontrou unidades nesse formato, adiciona ao data
+            if unidades_data:
+                data = data.copy()  # Criar uma cópia para modificar
+                data['unidades'] = unidades_data
+                logger.debug(f"Unidades construídas a partir de campos individuais: {unidades_data}")
                 
         return super().to_internal_value(data)
     
@@ -104,7 +103,10 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
         
         # Criar as unidades relacionadas
         for unidade_data in unidades_data:
-            Unidade.objects.create(formulario=formulario, **unidade_data)
+            Unidade.objects.create(
+                formulario=formulario,
+                **unidade_data
+            )
         
         return formulario
     
@@ -117,12 +119,15 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
         
         # Se houver novas unidades, atualizar
         if unidades_data:
-            # Remover as unidades antigas
+            # Opção 1: Substituir todas as unidades existentes
             instance.unidades.all().delete()
             
             # Criar as novas unidades
             for unidade_data in unidades_data:
-                Unidade.objects.create(formulario=instance, **unidade_data)
+                Unidade.objects.create(
+                    formulario=instance,
+                    **unidade_data
+                )
         
         return instance
     

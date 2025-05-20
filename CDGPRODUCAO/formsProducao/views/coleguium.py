@@ -3,14 +3,14 @@ import logging
 from rest_framework.permissions import IsAuthenticated
 
 from formsProducao.views.base_view import BaseFormularioView
-from formsProducao.serializers.form_serializers import coleguiumSerializer
-from formsProducao.services.form_services import coleguiumService
+from formsProducao.serializers import coleguiumSerializer
+from formsProducao.services import coleguiumService
 
 logger = logging.getLogger(__name__)
 
-class coleguiumView(BaseFormularioView):
+class ColeguiumView(BaseFormularioView):
     """
-    View para gerenciar o formulário coleguium.
+    View para gerenciar o formulário Coleguium.
     Herda funcionalidades da BaseFormularioView.
     """
     serializer_class = coleguiumSerializer

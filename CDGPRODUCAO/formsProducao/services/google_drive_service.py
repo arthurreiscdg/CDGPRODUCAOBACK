@@ -41,29 +41,34 @@ class BaseFormularioGoogleDriveService(FormularioService):
             
             # Verifica se já temos o ID da pasta
             if cls.PASTA_ID is not None:
+                logger.info(f"Pasta {cls.PASTA_NOME} já configurada com ID: {cls.PASTA_ID}")
                 return cls.PASTA_ID
                 
             # Verifica se já existe uma pasta com o nome especificado
             pastas = drive_service.get_folders()
             for pasta in pastas:
-                if pasta['name'] == cls.PASTA_NOME:
-                    cls.PASTA_ID = pasta['id']
-                    logger.info(f"Pasta {cls.PASTA_NOME} encontrada no Google Drive. ID: {cls.PASTA_ID}")
+                if pasta.get('name') == cls.PASTA_NOME:
+                    cls.PASTA_ID = pasta.get('id')
+                    logger.info(f"Pasta {cls.PASTA_NOME} encontrada com ID: {cls.PASTA_ID}")
                     return cls.PASTA_ID
+                
+            # Se não encontrou a pasta, cria uma nova
+            logger.info(f"Pasta {cls.PASTA_NOME} não encontrada. Criando nova pasta...")
+            cls.PASTA_ID = drive_service.create_folder(cls.PASTA_NOME)
             
-            # Se não existir, cria a pasta
-            pasta_id = drive_service.create_folder(cls.PASTA_NOME)
-            if pasta_id:
-                cls.PASTA_ID = pasta_id
-                logger.info(f"Pasta {cls.PASTA_NOME} criada no Google Drive. ID: {cls.PASTA_ID}")
-                return cls.PASTA_ID
+            if cls.PASTA_ID:
+                logger.info(f"Pasta {cls.PASTA_NOME} criada com sucesso. ID: {cls.PASTA_ID}")
             else:
-                logger.error(f"Não foi possível criar a pasta {cls.PASTA_NOME} no Google Drive")
-                return None
+                logger.error(f"Falha ao criar pasta {cls.PASTA_NOME} no Google Drive.")
+                
+            return cls.PASTA_ID
                 
         except Exception as e:
-            logger.error(f"Erro ao configurar pasta no Google Drive: {str(e)}")
+            logger.error(f"Erro ao configurar pasta {cls.PASTA_NOME} no Google Drive: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
+    
     @classmethod
     def processar_formulario(cls, dados_form, arquivo_pdf=None, usuario=None):
         """
