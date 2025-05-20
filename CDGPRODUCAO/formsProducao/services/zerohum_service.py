@@ -80,74 +80,19 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
             link_download = None
             web_view_link = None
             json_link = None
-              # Processar o upload do arquivo PDF para o Google Drive
+            
+            # Processar o upload do arquivo PDF para o Google Drive
             if arquivo_pdf:
                 # Nome do arquivo para upload
                 nome_arquivo = f"ZeroHum_{cod_op}.pdf"
-                logger.info(f"Processando arquivo PDF: {nome_arquivo}")
-                logger.info(f"Tipo do arquivo: {type(arquivo_pdf)}")
-                  # Caminho temporário para salvar o PDF antes de enviar ao Drive
+                
+                # Caminho temporário para salvar o PDF antes de enviar ao Drive
                 temp_file_path = os.path.join(settings.BASE_DIR, 'temp', nome_arquivo)
                 os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
                 
-                # Tratamento especial para arquivo codificado em base64
-                if 'arquivo_base64' in dados_form:
-                    import base64
-                    logger.info("Detectado arquivo em formato base64")
-                    try:
-                        arquivo_bytes = base64.b64decode(dados_form['arquivo_base64'])
-                        with open(temp_file_path, 'wb') as f:
-                            f.write(arquivo_bytes)
-                        logger.info(f"Arquivo base64 decodificado e salvo em: {temp_file_path}")
-                    except Exception as e:
-                        logger.error(f"Erro ao processar arquivo base64: {str(e)}")
-                        raise
-                else:
-                    try:
-                        # Salvar arquivo temporariamente
-                        with open(temp_file_path, 'wb') as f:
-                            if hasattr(arquivo_pdf, 'read'):
-                                # Se for um objeto de arquivo (como InMemoryUploadedFile ou TemporaryUploadedFile)
-                                logger.info("Processando arquivo como objeto de arquivo com método 'read'")
-                                chunk_size = 8192
-                                # Usar chunks para arquivos grandes
-                                for chunk in iter(lambda: arquivo_pdf.read(chunk_size), b''):
-                                    f.write(chunk)
-                                # Importante: Resetar o ponteiro do arquivo depois de ler
-                                arquivo_pdf.seek(0)
-                            elif isinstance(arquivo_pdf, bytes):
-                                # Se for um objeto bytes
-                                logger.info("Processando arquivo como bytes")
-                                f.write(arquivo_pdf)
-                            elif isinstance(arquivo_pdf, str):
-                                # Se for uma string (como um base64)
-                                logger.info("Processando arquivo como string")
-                                try:
-                                    # Tentar decodificar como base64
-                                    import base64
-                                    f.write(base64.b64decode(arquivo_pdf))
-                                except:
-                                    # Se não for base64, tratar como UTF-8
-                                    f.write(arquivo_pdf.encode('utf-8'))
-                            else:
-                                # Tenta uma última opção
-                                logger.info(f"Processando arquivo como tipo desconhecido: {type(arquivo_pdf)}")
-                                try:
-                                    f.write(bytes(arquivo_pdf))
-                                except:
-                                    logger.error("Não foi possível converter o arquivo para bytes")
-                                    raise ValueError("Formato de arquivo não suportado")
-                                    
-                        logger.info(f"Arquivo salvo com sucesso em: {temp_file_path}")
-                        logger.info(f"Tamanho do arquivo salvo: {os.path.getsize(temp_file_path)} bytes")
-                    except Exception as e:
-                        logger.error(f"Erro ao salvar arquivo temporário: {str(e)}")
-                        logger.error(f"Tipo do arquivo: {type(arquivo_pdf)}")
-                        if hasattr(arquivo_pdf, 'name'):
-                            logger.error(f"Nome do arquivo: {arquivo_pdf.name}")
-                        import traceback
-                        logger.error(traceback.format_exc())
-                        raise
+                # Salvar arquivo temporariamente
+                with open(temp_file_path, 'wb') as f:
+                    f.write(arquivo_pdf.read() if hasattr(arquivo_pdf, 'read') else arquivo_pdf)
                 
                 # Se estivermos em modo desenvolvimento e não temos acesso ao Google Drive
                 if desenvolvimento_local:

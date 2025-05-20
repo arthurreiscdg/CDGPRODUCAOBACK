@@ -21,16 +21,6 @@ class BaseFormularioView(APIView):
     serializer_class = None
     service_class = None
     
-    def dispatch(self, request, *args, **kwargs):
-        """
-        Sobrescrever o método dispatch para permitir que PATCH seja tratado como POST
-        Isso ajuda a contornar problemas quando o frontend usa PATCH em vez de POST
-        """
-        if request.method.lower() == 'patch':
-            logger.debug("Convertendo requisição PATCH para POST")
-            request.method = 'POST'
-        return super().dispatch(request, *args, **kwargs)
-    
     def post(self, request, *args, **kwargs):
         """
         Cria um novo formulário.
@@ -51,13 +41,9 @@ class BaseFormularioView(APIView):
             # Obtenha o usuário atual (se autenticado)
             usuario_atual = request.user if request.user.is_authenticated else None
             logger.debug(f"Usuário atual: {usuario_atual}")
-              # Processar dados da requisição
-            dados_requisicao = request.data.copy()
             
-            # Log de todos os dados e cabeçalhos da requisição para debug
-            logger.debug(f"Dados da requisição: {dict(dados_requisicao)}")
-            logger.debug(f"Content-Type: {request.content_type}")
-            logger.debug(f"Cabeçalhos: {request.headers}")
+            # Processar dados da requisição
+            dados_requisicao = request.data.copy()
               
             # Verificar se os dados foram enviados em um campo 'dados' (formato JSON)
             # Este é o formato usado pelo formulário HTML
@@ -70,40 +56,9 @@ class BaseFormularioView(APIView):
                 except Exception as e:
                     logger.error(f"Erro ao processar campo 'dados': {e}")
             
-            # Tratamento especial para unidades
-            if 'unidades' in dados_requisicao:
-                logger.debug(f"Campo 'unidades' encontrado: {dados_requisicao['unidades']}")
-                logger.debug(f"Tipo do campo 'unidades': {type(dados_requisicao['unidades'])}")
-                
-                # Se for string, tentar converter para JSON
-                if isinstance(dados_requisicao['unidades'], str):
-                    try:
-                        dados_requisicao['unidades'] = json.loads(dados_requisicao['unidades'])
-                        logger.debug(f"Unidades convertidas: {dados_requisicao['unidades']}")
-                    except Exception as e:
-                        logger.error(f"Erro ao converter unidades: {e}")            # Extrai o arquivo PDF, se existir
+            # Extrai o arquivo PDF, se existir
             arquivo_pdf = dados_requisicao.get('arquivo', None)
-            # Verifique também outros nomes comuns para campos de arquivo
-            if not arquivo_pdf and 'file' in request.FILES:
-                arquivo_pdf = request.FILES['file']
-                logger.debug("Arquivo encontrado no campo 'file'")
-            
             logger.debug(f"Arquivo PDF presente: {'Sim' if arquivo_pdf else 'Não'}")
-            # Detalhes do arquivo para debugging
-            if arquivo_pdf:
-                logger.debug(f"Tipo do arquivo: {type(arquivo_pdf)}")
-                logger.debug(f"Atributos do arquivo: {dir(arquivo_pdf)}")
-                if hasattr(arquivo_pdf, 'name'):
-                    logger.debug(f"Nome do arquivo: {arquivo_pdf.name}")
-                if hasattr(arquivo_pdf, 'content_type'):
-                    logger.debug(f"Tipo de conteúdo: {arquivo_pdf.content_type}")
-                if hasattr(arquivo_pdf, 'size'):
-                    logger.debug(f"Tamanho do arquivo: {arquivo_pdf.size} bytes")
-                # Verificar se o arquivo é válido
-                if hasattr(arquivo_pdf, 'file') and hasattr(arquivo_pdf.file, 'read'):
-                    logger.debug("O arquivo possui método 'read' e parece válido")
-                else:
-                    logger.warning("O arquivo não parece ser um objeto de arquivo válido")
 
             # Validar os dados usando o serializer
             serializer = self.serializer_class(data=dados_requisicao, context={'request': request})
