@@ -49,14 +49,16 @@ class ZeroHumSerializer(FormularioBaseSerializer):
                 logger.debug(f"Campos de unidades encontrados na request: {unidade_campos}")
         else:
             logger.debug("Sem objeto request no contexto")
-        
-        # Verificar se unidades é uma string e tentar converter
+          # Verificar se unidades é uma string e tentar converter
         if isinstance(unidades, str):
             try:
                 unidades = json.loads(unidades)
                 logger.debug(f"Unidades convertidas de string JSON: {unidades}")
+                # Atualizar os dados com as unidades convertidas
+                data['unidades'] = unidades
             except Exception as e:
                 logger.error(f"Erro ao converter unidades de string JSON: {e}")
+                logger.error(f"Conteúdo da string unidades: {unidades}")
         
         if not unidades or len(unidades) == 0:
             # Se não tem unidades, verificar se há unidades em algum outro formato nos dados originais
