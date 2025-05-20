@@ -31,7 +31,6 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
         model = Formulario
         fields = '__all__'
         read_only_fields = ('cod_op', 'link_download', 'web_view_link', 'json_link', 'criado_em', 'atualizado_em', 'usuario_info')
-    
     def to_internal_value(self, data):
         """
         Pré-processamento dos dados antes da validação.
@@ -41,24 +40,52 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
         # Log dos dados recebidos
         logger.debug(f"to_internal_value recebeu: {data}")
         
+        # Criar uma cópia mutável dos dados
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        
         # Normalização das unidades: pode vir como string JSON, objeto Python ou formato FormData
         if 'unidades' in data:
+            logger.debug(f"Unidades encontradas nos dados: {data['unidades']}, tipo: {type(data['unidades'])}")
+            
             # Caso 1: String JSON -> converter para lista de dicts
             if isinstance(data['unidades'], str):
                 try:
-                    data = data.copy()  # Criar uma cópia para modificar
                     unidades_json = json.loads(data['unidades'])
-                    data['unidades'] = unidades_json
                     logger.debug(f"Convertidas unidades de string JSON: {unidades_json}")
+                    
+                    # Garantir que é uma lista
+                    if isinstance(unidades_json, dict):
+                        unidades_json = [unidades_json]
+                    
+                    data['unidades'] = unidades_json
                 except Exception as e:
                     logger.error(f"Erro ao converter unidades de string JSON: {e}")
+                    # Em caso de erro, manter string original e deixar a validação tratar
             
             # Caso 2: Dict único -> converter para lista com um item
-            if isinstance(data['unidades'], dict):
-                data = data.copy()  # Criar uma cópia para modificar
+            elif isinstance(data['unidades'], dict):
                 data['unidades'] = [data['unidades']]
                 logger.debug("Convertido objeto de unidades de dict para lista")
+                
+            # Caso 3: Lista sem dicionários -> tentar converter cada item
+            elif isinstance(data['unidades'], list):
+                processed_unidades = []
+                for item in data['unidades']:
+                    if isinstance(item, str):
+                        try:
+                            item_dict = json.loads(item)
+                            processed_unidades.append(item_dict)
+                        except Exception:
+                            # Se não conseguir converter, manter o original
+                            processed_unidades.append(item)
+                    else:
+                        processed_unidades.append(item)
+                        
+                data['unidades'] = processed_unidades
+                logger.debug(f"Lista de unidades processada: {processed_unidades}")
         else:
+            logger.debug("Campo 'unidades' não encontrado, verificando formatos alternativos")
+            
             # Procurar por unidades em formato específico (nome_0, quantidade_0, nome_1, quantidade_1, etc.)
             unidades_data = []
             unidade_indices = set()
@@ -88,9 +115,12 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
             
             # Se encontrou unidades nesse formato, adiciona ao data
             if unidades_data:
-                data = data.copy()  # Criar uma cópia para modificar
                 data['unidades'] = unidades_data
                 logger.debug(f"Unidades construídas a partir de campos individuais: {unidades_data}")
+        
+        # Verificação final - se unidades está presente nos dados
+        if 'unidades' in data:
+            logger.debug(f"Unidades finais para processamento: {data['unidades']}")
                 
         return super().to_internal_value(data)
     

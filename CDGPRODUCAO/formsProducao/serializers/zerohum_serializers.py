@@ -12,7 +12,6 @@ class ZeroHumSerializer(FormularioBaseSerializer):
     class Meta(FormularioBaseSerializer.Meta):
         # Podemos customizar campos específicos aqui
         pass
-        
     def validate(self, data):
         """
         Validações específicas para o formulário ZeroHum.
@@ -31,41 +30,40 @@ class ZeroHumSerializer(FormularioBaseSerializer):
         # Verificar se pelo menos uma unidade foi enviada
         unidades = data.get('unidades', [])
         logger.debug(f"Unidades no validate: {unidades}, tipo: {type(unidades)}")
-        logger.debug(f"Verificação de unidades: está vazio? {not unidades}")
-        logger.debug(f"Unidades é lista vazia? {unidades == []}")
-        logger.debug(f"Unidades é None? {unidades is None}")
         
-        # Verifica se o context tem a request
+        # Verificar se unidades existe no request original (pode estar em formato diferente)
         request = self.context.get('request')
-        if request:
-            logger.debug(f"Cabeçalhos da request: {request.headers}")
-            logger.debug(f"Método: {request.method}")
-            logger.debug(f"Content-Type: {request.content_type}")
-            logger.debug(f"Dados recebidos brutos: {request.data}")
+        if request and hasattr(request, 'data'):
+            raw_unidades = request.data.get('unidades')
+            logger.debug(f"Unidades brutas na request: {raw_unidades}, tipo: {type(raw_unidades)}")
             
-            # Procura por campos relacionados a unidades no request.data
-            unidade_campos = [k for k in request.data.keys() if 'unidade' in k.lower()]
-            if unidade_campos:
-                logger.debug(f"Campos de unidades encontrados na request: {unidade_campos}")
-        else:
-            logger.debug("Sem objeto request no contexto")
-        
-        # Verificar se unidades é uma string e tentar converter
+            # Se unidades não está nos dados validados, mas está na request como string, tenta processar
+            if not unidades and isinstance(raw_unidades, str):
+                try:
+                    unidades_json = json.loads(raw_unidades)
+                    logger.debug(f"Unidades convertidas de string JSON da request: {unidades_json}")
+                    # Adicionar unidades convertidas aos dados
+                    data['unidades'] = unidades_json
+                    unidades = unidades_json
+                except Exception as e:
+                    logger.error(f"Erro ao converter unidades de string JSON da request: {e}")
+                    
+        # Verifica se unidades é uma string e tenta convertê-la para JSON
         if isinstance(unidades, str):
             try:
                 unidades = json.loads(unidades)
                 logger.debug(f"Unidades convertidas de string JSON: {unidades}")
+                data['unidades'] = unidades
             except Exception as e:
                 logger.error(f"Erro ao converter unidades de string JSON: {e}")
         
+        # Formatos alternativos de unidades
         if not unidades or len(unidades) == 0:
-            # Se não tem unidades, verificar se há unidades em algum outro formato nos dados originais
-            logger.warning("Nenhuma unidade foi encontrada no campo unidades.")
+            logger.debug("Tentando encontrar unidades em formatos alternativos...")
             
-            # Verificar se há unidades no request original
-            request = self.context.get('request')
+            # Verificar se há campos individuais para unidades no request
             if request and hasattr(request, 'data'):
-                # Procurar por campos no formato nome_0, quantidade_0, etc.
+                # 1. Verificar formato nome_0, quantidade_0
                 unidades_alternativas = []
                 i = 0
                 while f'nome_{i}' in request.data:
@@ -84,16 +82,31 @@ class ZeroHumSerializer(FormularioBaseSerializer):
                     
                     i += 1
                 
+                # 2. Verificar formato unidades[] no multipart/form-data
+                if not unidades_alternativas and hasattr(request.data, 'getlist'):
+                    unidades_items = request.data.getlist('unidades[]', [])
+                    if unidades_items:
+                        try:
+                            for item in unidades_items:
+                                if isinstance(item, str):
+                                    item_dict = json.loads(item)
+                                    unidades_alternativas.append(item_dict)
+                                else:
+                                    unidades_alternativas.append(item)
+                            logger.debug(f"Unidades encontradas no formato unidades[]: {unidades_alternativas}")
+                        except Exception as e:
+                            logger.error(f"Erro ao processar unidades[]: {e}")
+                
                 if unidades_alternativas:
                     logger.debug(f"Unidades alternativas encontradas: {unidades_alternativas}")
                     data['unidades'] = unidades_alternativas
                     unidades = unidades_alternativas
-            
-            # Se chegou aqui, realmente não há unidades
-            if not unidades or len(unidades) == 0:
-                raise serializers.ValidationError({
-                    "unidades": "Pelo menos uma unidade deve ser informada."
-                })
+        
+        # Se chegou aqui, realmente não há unidades
+        if not unidades or len(unidades) == 0:
+            raise serializers.ValidationError({
+                "unidades": "Pelo menos uma unidade deve ser informada."
+            })
         
         # Verificar se cada unidade tem nome e quantidade válida
         for i, unidade in enumerate(unidades):

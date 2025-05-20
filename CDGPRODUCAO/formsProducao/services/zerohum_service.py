@@ -44,8 +44,7 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
             
             # Gera um código de operação único
             cod_op = cls.gerar_cod_op()
-            
-            # Extrair as unidades dos dados do formulário
+              # Extrair as unidades dos dados do formulário
             unidades_data = dados_form.pop('unidades', [])
             logger.info(f"Tipo de unidades_data: {type(unidades_data)}")
             logger.info(f"Unidades recebidas: {unidades_data}")
@@ -54,21 +53,46 @@ class ZeroHumService(BaseFormularioGoogleDriveService):
             if not unidades_data:
                 logger.warning("Nenhuma unidade encontrada nos dados do formulário")
             
-            # Se unidades_data for uma string, tentar converter para lista
+            # Processamento avançado de unidades
+            # Garantir que unidades_data seja uma lista de dicionários válidos
+            processed_unidades = []
+            
+            # Caso 1: String JSON
             if isinstance(unidades_data, str):
                 try:
                     unidades_data = json.loads(unidades_data)
                     logger.info(f"Unidades convertidas de string JSON: {unidades_data}")
                 except Exception as e:
                     logger.error(f"Erro ao converter unidades de string JSON: {e}")
+                    unidades_data = []
             
-            # Garantir que unidades_data seja uma lista
+            # Caso 2: Dict único
             if isinstance(unidades_data, dict):
                 unidades_data = [unidades_data]
                 logger.info("Convertido objeto de unidades de dict para lista")
+            
+            # Caso 3: Lista de itens
+            if isinstance(unidades_data, list):
+                for item in unidades_data:
+                    # Se o item for uma string, tentar converter para dict
+                    if isinstance(item, str):
+                        try:
+                            item_dict = json.loads(item)
+                            if isinstance(item_dict, dict) and 'nome' in item_dict and 'quantidade' in item_dict:
+                                processed_unidades.append(item_dict)
+                        except Exception as e:
+                            logger.error(f"Erro ao processar item de unidade como string: {e}")
+                    # Se o item for um dict, verificar campos necessários
+                    elif isinstance(item, dict) and 'nome' in item and 'quantidade' in item:
+                        processed_unidades.append(item)
+            
+            # Se conseguimos processar unidades, usar a versão processada
+            if processed_unidades:
+                unidades_data = processed_unidades
+                logger.info(f"Unidades processadas com sucesso: {unidades_data}")
             elif not isinstance(unidades_data, list):
                 unidades_data = []
-                logger.warning("Unidades não é uma lista nem pode ser convertida para uma")
+                logger.warning("Unidades não é uma lista válida nem pode ser convertida para uma")
             
             # Dados do formulário para salvar
             form_data = {

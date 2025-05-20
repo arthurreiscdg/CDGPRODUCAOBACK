@@ -20,7 +20,6 @@ class BaseFormularioView(APIView):
     # A definir nas subclasses
     serializer_class = None
     service_class = None
-    
     def post(self, request, *args, **kwargs):
         """
         Cria um novo formulário.
@@ -37,13 +36,19 @@ class BaseFormularioView(APIView):
                 
             # Log de depuração
             logger.debug(f"Recebendo dados para formulário: {request.data}")
+            logger.debug(f"Content-Type da requisição: {request.content_type}")
             
             # Obtenha o usuário atual (se autenticado)
             usuario_atual = request.user if request.user.is_authenticated else None
             logger.debug(f"Usuário atual: {usuario_atual}")
             
             # Processar dados da requisição
-            dados_requisicao = request.data.copy()
+            dados_requisicao = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            
+            # Processar campos específicos
+            if 'unidades' in dados_requisicao:
+                logger.debug(f"Campo 'unidades' encontrado: {dados_requisicao['unidades']}, tipo: {type(dados_requisicao['unidades'])}")
+                # Não precisa de processamento adicional aqui - será feito no serializer
               
             # Verificar se os dados foram enviados em um campo 'dados' (formato JSON)
             # Este é o formato usado pelo formulário HTML
@@ -60,13 +65,15 @@ class BaseFormularioView(APIView):
             arquivo_pdf = dados_requisicao.get('arquivo', None)
             logger.debug(f"Arquivo PDF presente: {'Sim' if arquivo_pdf else 'Não'}")
 
+            # Log completo dos dados antes da validação
+            logger.debug(f"Dados completos enviados para o serializer: {dados_requisicao}")
+
             # Validar os dados usando o serializer
             serializer = self.serializer_class(data=dados_requisicao, context={'request': request})
             
             if not serializer.is_valid():
                 logger.error(f"Erros na validação do serializer: {serializer.errors}")
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
             # Dados validados
             dados_validados = serializer.validated_data
             
