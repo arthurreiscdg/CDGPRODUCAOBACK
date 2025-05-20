@@ -42,7 +42,14 @@ class Formulario(models.Model):
     formato = models.CharField(max_length=10, choices=FORMATO_CHOICES, default='A4', null=True, blank=True)
     cor_impressao = models.CharField(max_length=10, choices=COR_IMPRESSAO_CHOICES, default='PB', null=True, blank=True)
     impressao = models.CharField(max_length=20, choices=IMPRESSAO_CHOICES, default='1_LADO', null=True, blank=True)
-      # Campos de ArquivoPDF
+    gramatura = models.CharField(max_length=10, default='75g')
+    papel_adesivo = models.BooleanField(default=False)
+    tipo_adesivo = models.CharField(max_length=50, null=True, blank=True)
+    grampos = models.CharField(max_length=10, null=True, blank=True)
+    espiral = models.BooleanField(default=False)
+    capa_pvc = models.BooleanField(default=False)
+
+    # Campos de ArquivoPDF
     arquivo = models.FileField(upload_to='pdfs/', null=True, blank=True)
     cod_op = models.CharField(max_length=10, null=True, blank=True)
     link_download = models.URLField(max_length=500, null=True, blank=True)
