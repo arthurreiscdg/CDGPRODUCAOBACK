@@ -4,3 +4,4 @@ from .pensi_serializers import PensiSerializer
 from .elite_serializers import EliteSerializer
 from .coleguium_serializers import coleguiumSerializer
 from .unidade_serializers import UnidadeSerializer, UnidadeCreateSerializer
+from .arquivopdf_serializers import ArquivoPDFSerializer, ArquivoPDFCreateSerializer

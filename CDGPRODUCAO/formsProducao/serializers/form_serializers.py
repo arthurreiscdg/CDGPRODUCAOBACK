@@ -1,9 +1,12 @@
 from rest_framework import serializers
 import json
 import logging
+import logging
 from formsProducao.models.formulario import Formulario
 from formsProducao.models.unidade import Unidade
+from formsProducao.models.arquivopdf import ArquivoPDF
 from formsProducao.serializers.unidade_serializers import UnidadeCreateSerializer, UnidadeSerializer
+from formsProducao.serializers.arquivopdf_serializers import ArquivoPDFSerializer
 from django.utils import timezone
 from django.contrib.auth.models import User
 
@@ -21,16 +24,22 @@ class UserBasicInfoSerializer(serializers.ModelSerializer):
 class FormularioBaseSerializer(serializers.ModelSerializer):
     """
     Serializer base para todos os formulários de produção.
-    """
-    arquivo = serializers.FileField(required=False, write_only=True)
+    """    
+    arquivos = serializers.FileField(required=False, write_only=True)
+    arquivos_nomes = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        write_only=True
+    )
     usuario_info = UserBasicInfoSerializer(source='usuario', read_only=True)
     unidades = UnidadeCreateSerializer(many=True, required=False)
     unidades_info = UnidadeSerializer(source='unidades', many=True, read_only=True)
+    arquivos_pdf = ArquivoPDFSerializer(many=True, read_only=True, source='arquivos_pdf')
     
     class Meta:
         model = Formulario
         fields = '__all__'
-        read_only_fields = ('cod_op', 'link_download', 'web_view_link', 'json_link', 'criado_em', 'atualizado_em', 'usuario_info')
+        read_only_fields = ('cod_op', 'criado_em', 'atualizado_em', 'usuario_info', 'arquivos_pdf')
     def to_internal_value(self, data):
         """
         Pré-processamento dos dados antes da validação.
@@ -160,14 +169,16 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
                 )
         
         return instance
-    
     def to_representation(self, instance):
         """
-        Customiza a representação para incluir as unidades
+        Customiza a representação para incluir as unidades e arquivos PDF
         """
         representation = super().to_representation(instance)
         
         # Adiciona as unidades
         representation['unidades'] = UnidadeSerializer(instance.unidades.all(), many=True).data
+        
+        # Adiciona os arquivos PDF
+        representation['arquivos_pdf'] = ArquivoPDFSerializer(instance.arquivos_pdf.all(), many=True).data
         
         return representation

@@ -2,10 +2,12 @@ import os
 import uuid
 import json
 import logging
+import traceback
 from django.utils import timezone
 from django.conf import settings
 from formsProducao.utils.drive import GoogleDriveService
 from formsProducao.models.formulario import Formulario
+from formsProducao.models.arquivopdf import ArquivoPDF
 from formsProducao.services.form_services import FormularioService
 
 logger = logging.getLogger(__name__)
@@ -70,168 +72,233 @@ class BaseFormularioGoogleDriveService(FormularioService):
             return None
     
     @classmethod
-    def processar_formulario(cls, dados_form, arquivo_pdf=None, usuario=None):
+    def processar_formulario(cls, dados_form, arquivos_pdf=None, usuario=None):
         """
         Processa um formulário, salvando-o no banco de dados e 
-        fazendo upload do PDF no Google Drive.
+        fazendo upload dos PDFs no Google Drive.
         
         Args:
             dados_form (dict): Dados do formulário validados
-            arquivo_pdf (bytes, optional): Conteúdo do arquivo PDF
+            arquivos_pdf (list, optional): Lista de tuplas com (arquivo, nome_arquivo)
             usuario (User, optional): Usuário logado que está enviando o formulário
             
         Returns:
             Formulario: Objeto do formulário criado e processado
         """
         try:
+            # Durante o desenvolvimento, se não houver credenciais do Google Drive,
+            # podemos salvar os arquivos localmente
+            # Verifica se existe o arquivo de credenciais ou se as variáveis de ambiente estão configuradas
+            existe_arquivo_credenciais = os.path.exists(os.path.join(settings.BASE_DIR, 'credentials', 'google_drive_credentials.json'))
+            existe_env_credenciais = bool(os.environ.get("GOOGLE_PRIVATE_KEY") and os.environ.get("GOOGLE_CLIENT_EMAIL"))
+            
+            desenvolvimento_local = not (existe_arquivo_credenciais or existe_env_credenciais)
+            logger.info(f"Modo de desenvolvimento local: {desenvolvimento_local}")
+            
             # Gera um código de operação único
             cod_op = cls.gerar_cod_op()
             
-            # Cria uma instância do formulário
-            formulario = Formulario.objects.create(
+            # Extrair as unidades dos dados do formulário
+            unidades_data = dados_form.pop('unidades', [])
+            logger.info(f"Tipo de unidades_data: {type(unidades_data)}")
+            logger.info(f"Unidades recebidas: {unidades_data}")
+            
+            # Se não houver unidades, verificar se foi um erro de processamento
+            if not unidades_data:
+                logger.warning("Nenhuma unidade recebida no formulário")
+            
+            # Dados do formulário para salvar
+            form_data = {
                 **dados_form,
-                cod_op=cod_op,
-                usuario=usuario  # Associa o usuário ao formulário
-            )
-            # Se tiver um arquivo PDF, processa-o
-            if arquivo_pdf:
-                nome_arquivo = f"{cls.PASTA_NOME}_{cod_op}.pdf"
-                
-                # Salva o arquivo temporariamente
-                caminho_local = cls.salvar_pdf_local(arquivo_pdf, nome_arquivo)
-                
-                if caminho_local:
-                    # Configura a pasta no Google Drive se necessário
-                    if cls.PASTA_ID is None:
-                        cls.setup_pasta_drive()
-                          # Faz upload para o Google Drive
-                    drive_service = GoogleDriveService()
-                    resultado_upload = drive_service.upload_pdf(
-                        caminho_local, 
-                        nome_arquivo,
-                        cls.PASTA_ID
-                    )
-                    
-                    # Log do resultado do upload para diagnóstico
-                    logger.info(f"Resultado do upload para o Google Drive: {resultado_upload}")
-                    
-                    # Se o upload para o Google Drive falhar, exclua o formulário e retorne None
-                    if not resultado_upload:
-                        logger.error(f"Falha ao fazer upload para o Google Drive. Excluindo formulário {cod_op}")
-                        formulario.delete()
-                        return None
-                        
-                    # Se o upload for bem-sucedido, atualiza o formulário com os links
-                    download_link = resultado_upload.get('download_link')
-                    web_view_link = resultado_upload.get('web_link')
-                    logger.info(f"Link de download: {download_link}")
-                    logger.info(f"Link de visualização: {web_view_link}")
-                    formulario.link_download = download_link
-                    formulario.web_view_link = web_view_link
-                    
-                    # Cria um JSON com os detalhes do formulário
-                    dados_json = {
-                        'cod_op': cod_op,
-                        'nome': dados_form.get('nome'),
-                        'email': dados_form.get('email'),
-                        'unidade': dados_form.get('unidade_nome'),
-                        'titulo': dados_form.get('titulo'),
-                        'data_entrega': str(dados_form.get('data_entrega')),
-                        'link_pdf': download_link,
-                        'link_visualizacao': web_view_link
+                'cod_op': cod_op
+            }
+            
+            # Se o usuário estiver autenticado, vincula o formulário a ele
+            if usuario and usuario.is_authenticated:
+                form_data['usuario'] = usuario
+            
+            # Salva o formulário no banco de dados
+            formulario = Formulario.objects.create(**form_data)
+            logger.info(f"Formulário {cod_op} criado com sucesso")
+            
+            # Cria as unidades relacionadas ao formulário
+            for unidade_data in unidades_data:
+                if isinstance(unidade_data, dict):
+                    unidade = {
+                        'formulario': formulario,
+                        'nome': unidade_data.get('nome'),
+                        'quantidade': unidade_data.get('quantidade', 1)
                     }
-                    
-                    formulario.json_link = json.dumps(dados_json)
-                    formulario.save()
+                    formulario.unidades.create(**unidade)
+            
+            # Processa os arquivos PDF
+            if arquivos_pdf:
+                # Se tiver arquivos PDF para processar
+                for arquivo, nome_arquivo in arquivos_pdf:
+                    if not arquivo:
+                        logger.warning(f"Arquivo PDF vazio ou inválido para {nome_arquivo}")
+                        continue
                         
-                    # Remove o arquivo temporário
-                    if os.path.exists(caminho_local):
-                        os.remove(caminho_local)
+                    # Processa o upload do arquivo para o Drive ou salva localmente
+                    if desenvolvimento_local:
+                        # Salva localmente durante o desenvolvimento
+                        caminho_local = cls.salvar_pdf_local(arquivo, f"{cls.PASTA_NOME}_{cod_op}.pdf")
+                        
+                        # Cria registro do ArquivoPDF
+                        arquivo_pdf = ArquivoPDF.objects.create(
+                            formulario=formulario,
+                            nome=nome_arquivo,
+                            arquivo=caminho_local
+                        )
+                        logger.info(f"Arquivo PDF salvo localmente: {caminho_local}")
+                    else:
+                        # Inicializa o serviço do Drive
+                        drive_service = GoogleDriveService()
+                        
+                        # Garante que a pasta de destino existe
+                        if not cls.PASTA_ID:
+                            cls.setup_pasta_drive()
+                        
+                        # Salva o arquivo temporariamente
+                        temp_file_path = cls.salvar_pdf_local(arquivo, f"{cls.PASTA_NOME}_{cod_op}_{nome_arquivo}.pdf")
+                        
+                        # Faz upload para o Google Drive
+                        if temp_file_path:
+                            upload_result = drive_service.upload_pdf(
+                                temp_file_path, 
+                                f"{cod_op}_{nome_arquivo}.pdf", 
+                                cls.PASTA_ID
+                            )
+                            
+                            # Cria o registro do ArquivoPDF
+                            if upload_result and 'id' in upload_result:
+                                arquivo_pdf = ArquivoPDF.objects.create(
+                                    formulario=formulario,
+                                    nome=nome_arquivo,
+                                    link_download=upload_result.get('webContentLink', ''),
+                                    web_view_link=upload_result.get('webViewLink', ''),
+                                    json_link=json.dumps(upload_result)
+                                )
+                                logger.info(f"Arquivo PDF enviado para o Google Drive: {upload_result.get('webViewLink', '')}")
+                            
+                            # Apaga o arquivo temporário
+                            try:
+                                os.remove(temp_file_path)
+                            except Exception as e:
+                                logger.warning(f"Não foi possível remover o arquivo temporário: {e}")
             
             return formulario
             
         except Exception as e:
-            logger.error(f"Erro ao processar formulário {cls.PASTA_NOME}: {str(e)}")
+            logger.error(f"Erro ao processar formulário: {str(e)}")
+            logger.error(traceback.format_exc())
             raise
 
     @classmethod
-    def atualizar_formulario(cls, formulario, dados_atualizados, arquivo_pdf=None):
+    def atualizar_formulario(cls, formulario, dados_atualizados, arquivos_pdf=None):
         """
-        Atualiza um formulário existente, com suporte a upload de novo PDF no Google Drive.
+        Atualiza um formulário existente, com suporte a upload de novos PDFs no Google Drive.
         
         Args:
             formulario (Formulario): Instância do formulário a ser atualizado
             dados_atualizados (dict): Novos dados para o formulário
-            arquivo_pdf (bytes, optional): Novo arquivo PDF, se houver
+            arquivos_pdf (list, optional): Lista de tuplas com (arquivo, nome_arquivo)
             
         Returns:
             Formulario: Objeto do formulário atualizado
         """
         try:
+            # Verifica se existe o arquivo de credenciais ou se as variáveis de ambiente estão configuradas
+            existe_arquivo_credenciais = os.path.exists(os.path.join(settings.BASE_DIR, 'credentials', 'google_drive_credentials.json'))
+            existe_env_credenciais = bool(os.environ.get("GOOGLE_PRIVATE_KEY") and os.environ.get("GOOGLE_CLIENT_EMAIL"))
+            
+            desenvolvimento_local = not (existe_arquivo_credenciais or existe_env_credenciais)
+            logger.info(f"Modo de desenvolvimento local: {desenvolvimento_local}")
+            
             # Atualiza os campos do formulário com os novos dados
             for campo, valor in dados_atualizados.items():
-                # Não atualiza campos somente leitura
-                if campo not in ['cod_op', 'arquivo', 'link_download', 'web_view_link', 'json_link', 'criado_em', 'atualizado_em']:
+                # Não atualiza campos somente leitura ou relações especiais
+                if campo not in ['cod_op', 'criado_em', 'atualizado_em', 'unidades']:
                     setattr(formulario, campo, valor)
             
-            # Se tiver um novo arquivo PDF, processa-o
-            if arquivo_pdf:
-                nome_arquivo = f"{cls.PASTA_NOME}_{formulario.cod_op}.pdf"
+            # Atualiza as unidades se necessário
+            if 'unidades' in dados_atualizados:
+                unidades_data = dados_atualizados['unidades']
                 
-                # Salva o arquivo temporariamente
-                caminho_local = cls.salvar_pdf_local(arquivo_pdf, nome_arquivo)
+                # Remove todas as unidades existentes
+                formulario.unidades.all().delete()
                 
-                if caminho_local:
-                    # Configura a pasta no Google Drive se necessário
-                    if cls.PASTA_ID is None:
-                        cls.setup_pasta_drive()
-                    
-                    # Faz upload para o Google Drive
-                    drive_service = GoogleDriveService()
-                    resultado_upload = drive_service.upload_pdf(
-                        caminho_local, 
-                        nome_arquivo,
-                        cls.PASTA_ID
-                    )
-                    
-                    # Log do resultado do upload para diagnóstico
-                    logger.info(f"Resultado do upload para o Google Drive na atualização: {resultado_upload}")
-                    
-                    # Se o upload falhar, não atualize o formulário e registre o erro
-                    if not resultado_upload:
-                        logger.error(f"Falha ao fazer upload do PDF para o Google Drive. Formulário {formulario.cod_op} não foi atualizado.")
-                        return formulario
-                    
-                    # Se o upload for bem-sucedido, atualiza o formulário com os links
-                    download_link = resultado_upload.get('download_link')
-                    web_view_link = resultado_upload.get('web_link')
-                    logger.info(f"Link de download na atualização: {download_link}")
-                    logger.info(f"Link de visualização na atualização: {web_view_link}")
-                    formulario.link_download = download_link
-                    formulario.web_view_link = web_view_link
-                    
-                    # Atualiza o JSON com os detalhes do formulário
-                    dados_json = {
-                        'cod_op': formulario.cod_op,
-                        'nome': formulario.nome,
-                        'email': formulario.email,
-                        'unidade': formulario.unidade_nome,
-                        'titulo': formulario.titulo,
-                        'data_entrega': str(formulario.data_entrega),
-                        'link_pdf': download_link,
-                        'link_visualizacao': web_view_link
-                    }
-                    
-                    formulario.json_link = json.dumps(dados_json)
-                        
-                    # Remove o arquivo temporário
-                    if os.path.exists(caminho_local):
-                        os.remove(caminho_local)
+                # Cria as novas unidades
+                for unidade_data in unidades_data:
+                    if isinstance(unidade_data, dict):
+                        unidade = {
+                            'formulario': formulario,
+                            'nome': unidade_data.get('nome'),
+                            'quantidade': unidade_data.get('quantidade', 1)
+                        }
+                        formulario.unidades.create(**unidade)
             
-            # Salva as alterações
+            # Salva as alterações do formulário
             formulario.save()
+            
+            # Processa os novos arquivos PDF se houver
+            if arquivos_pdf:
+                for arquivo, nome_arquivo in arquivos_pdf:
+                    if not arquivo:
+                        logger.warning(f"Arquivo PDF vazio ou inválido para {nome_arquivo}")
+                        continue
+                    
+                    # Processa o upload do arquivo para o Drive ou salva localmente
+                    if desenvolvimento_local:
+                        # Salva localmente durante o desenvolvimento
+                        caminho_local = cls.salvar_pdf_local(arquivo, f"{cls.PASTA_NOME}_{formulario.cod_op}_{nome_arquivo}.pdf")
+                        
+                        # Cria registro do ArquivoPDF
+                        arquivo_pdf = ArquivoPDF.objects.create(
+                            formulario=formulario,
+                            nome=nome_arquivo,
+                            arquivo=caminho_local
+                        )
+                        logger.info(f"Arquivo PDF salvo localmente: {caminho_local}")
+                    else:
+                        # Inicializa o serviço do Drive
+                        drive_service = GoogleDriveService()
+                        
+                        # Garante que a pasta de destino existe
+                        if not cls.PASTA_ID:
+                            cls.setup_pasta_drive()
+                        
+                        # Salva o arquivo temporariamente
+                        temp_file_path = cls.salvar_pdf_local(arquivo, f"{cls.PASTA_NOME}_{formulario.cod_op}_{nome_arquivo}.pdf")
+                        
+                        # Faz upload para o Google Drive
+                        if temp_file_path:
+                            upload_result = drive_service.upload_pdf(
+                                temp_file_path, 
+                                f"{formulario.cod_op}_{nome_arquivo}.pdf", 
+                                cls.PASTA_ID
+                            )
+                            
+                            # Cria o registro do ArquivoPDF
+                            if upload_result and 'id' in upload_result:
+                                arquivo_pdf = ArquivoPDF.objects.create(
+                                    formulario=formulario,
+                                    nome=nome_arquivo,
+                                    link_download=upload_result.get('webContentLink', ''),
+                                    web_view_link=upload_result.get('webViewLink', ''),
+                                    json_link=json.dumps(upload_result)
+                                )
+                                logger.info(f"Arquivo PDF enviado para o Google Drive: {upload_result.get('webViewLink', '')}")
+                            
+                            # Apaga o arquivo temporário
+                            try:
+                                os.remove(temp_file_path)
+                            except Exception as e:
+                                logger.warning(f"Não foi possível remover o arquivo temporário: {e}")
+            
             return formulario
             
         except Exception as e:
-            logger.error(f"Erro ao atualizar formulário {cls.PASTA_NOME}: {str(e)}")
+            logger.error(f"Erro ao atualizar formulário: {str(e)}")
+            logger.error(traceback.format_exc())
             raise

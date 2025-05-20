@@ -1,12 +1,11 @@
 # filepath: c:\Users\Arthur Reis\Documents\PROJETOCASADAGRAFICA\CDGPRODUCAOBACK\CDGPRODUCAO\formsProducao\views\base_view.py
 import logging
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
-import json
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +59,42 @@ class BaseFormularioView(APIView):
                     logger.debug(f"Dados extraídos do campo 'dados': {dados_json}")
                 except Exception as e:
                     logger.error(f"Erro ao processar campo 'dados': {e}")
+              # Extrai os arquivos PDF, se existirem
+            arquivos_pdf = []
             
-            # Extrai o arquivo PDF, se existir
-            arquivo_pdf = dados_requisicao.get('arquivo', None)
-            logger.debug(f"Arquivo PDF presente: {'Sim' if arquivo_pdf else 'Não'}")
+            # Caso 1: Um único arquivo (compatibilidade com versão anterior)
+            arquivo = dados_requisicao.get('arquivo', None)
+            if arquivo:
+                nome_arquivo = getattr(arquivo, 'name', 'arquivo.pdf')
+                arquivos_pdf.append((arquivo, nome_arquivo))
+                logger.debug(f"Arquivo PDF único encontrado: {nome_arquivo}")
+                
+            # Caso 2: Múltiplos arquivos
+            if 'arquivos' in dados_requisicao:
+                arquivos_lista = dados_requisicao.getlist('arquivos') if hasattr(dados_requisicao, 'getlist') else [dados_requisicao.get('arquivos')]
+                logger.debug(f"Arquivos encontrados: {len(arquivos_lista)}")
+                
+                # Verifica se há nomes de arquivos correspondentes
+                nomes = []
+                if 'arquivos_nomes' in dados_requisicao:
+                    nomes_raw = dados_requisicao.get('arquivos_nomes')
+                    if isinstance(nomes_raw, str):
+                        try:
+                            nomes = json.loads(nomes_raw)
+                        except:
+                            nomes = [nomes_raw]
+                    elif isinstance(nomes_raw, list):
+                        nomes = nomes_raw
+                
+                # Para cada arquivo, adiciona à lista com seu nome
+                for i, arquivo in enumerate(arquivos_lista):
+                    if arquivo:
+                        # Se tiver nome correspondente, usa; senão usa o nome do arquivo ou um nome genérico
+                        nome = nomes[i] if i < len(nomes) else getattr(arquivo, 'name', f'arquivo_{i+1}.pdf')
+                        arquivos_pdf.append((arquivo, nome))
+                        logger.debug(f"Arquivo PDF adicional encontrado: {nome}")
+            
+            logger.debug(f"Total de arquivos PDF para processamento: {len(arquivos_pdf)}")
 
             # Log completo dos dados antes da validação
             logger.debug(f"Dados completos enviados para o serializer: {dados_requisicao}")
@@ -76,11 +107,10 @@ class BaseFormularioView(APIView):
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             # Dados validados
             dados_validados = serializer.validated_data
-            
-            # Chama o serviço para processar o formulário e salvar
+              # Chama o serviço para processar o formulário e salvar
             formulario = self.service_class.processar_formulario(
                 dados_form=dados_validados,
-                arquivo_pdf=arquivo_pdf,
+                arquivos_pdf=arquivos_pdf,
                 usuario=usuario_atual
             )
             
@@ -175,24 +205,53 @@ class BaseFormularioView(APIView):
                     {"detail": "Dados inválidos", "errors": serializer.errors},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-                
-            # Verifica se tem arquivo PDF anexado
-            arquivo_pdf = None
+                  # Extrai os arquivos PDF, se existirem
+            arquivos_pdf = []
+            
+            # Caso 1: Um único arquivo (compatibilidade com versão anterior)
             if 'arquivo' in request.FILES:
-                arquivo_pdf = request.FILES['arquivo'].read()
+                arquivo = request.FILES['arquivo']
+                nome_arquivo = getattr(arquivo, 'name', 'arquivo.pdf')
+                arquivos_pdf.append((arquivo.read(), nome_arquivo))
+                logger.debug(f"Arquivo PDF único encontrado: {nome_arquivo}")
+                
+            # Caso 2: Múltiplos arquivos
+            if 'arquivos' in request.FILES:
+                arquivos_lista = request.FILES.getlist('arquivos')
+                logger.debug(f"Arquivos encontrados: {len(arquivos_lista)}")
+                
+                # Verifica se há nomes de arquivos correspondentes
+                nomes = []
+                if 'arquivos_nomes' in request.data:
+                    nomes_raw = request.data.get('arquivos_nomes')
+                    if isinstance(nomes_raw, str):
+                        try:
+                            nomes = json.loads(nomes_raw)
+                        except:
+                            nomes = [nomes_raw]
+                    elif isinstance(nomes_raw, list):
+                        nomes = nomes_raw
+                
+                # Para cada arquivo, adiciona à lista com seu nome
+                for i, arquivo in enumerate(arquivos_lista):
+                    if arquivo:
+                        # Se tiver nome correspondente, usa; senão usa o nome do arquivo ou um nome genérico
+                        nome = nomes[i] if i < len(nomes) else getattr(arquivo, 'name', f'arquivo_{i+1}.pdf')
+                        arquivos_pdf.append((arquivo.read(), nome))
+                        logger.debug(f"Arquivo PDF adicional encontrado: {nome}")
+                
+            logger.debug(f"Total de arquivos PDF para atualização: {len(arquivos_pdf)}")
                 
             # Atualiza o formulário
             formulario = self.service_class.atualizar_formulario(
                 formulario,
                 serializer.validated_data,
-                arquivo_pdf
-            )
-              # Retorna os dados atualizados
+                arquivos_pdf if arquivos_pdf else None
+            )            # Retorna os dados atualizados
+            resposta_serializer = self.serializer_class(formulario)
             return Response({
                 "detail": "Formulário atualizado com sucesso",
-                "cod_op": formulario.cod_op,
-                "link_download": formulario.link_download,
-                "web_view_link": formulario.web_view_link
+                "formulario": resposta_serializer.data
             })
             
         except Exception as e:

@@ -47,14 +47,8 @@ class Formulario(models.Model):
     tipo_adesivo = models.CharField(max_length=50, null=True, blank=True)
     grampos = models.CharField(max_length=10, null=True, blank=True)
     espiral = models.BooleanField(default=False)
-    capa_pvc = models.BooleanField(default=False)
-
-    # Campos de ArquivoPDF
-    arquivo = models.FileField(upload_to='pdfs/', null=True, blank=True)
-    cod_op = models.CharField(max_length=10, null=True, blank=True)
-    link_download = models.URLField(max_length=500, null=True, blank=True)
-    web_view_link = models.URLField(max_length=500, null=True, blank=True, verbose_name="Link de visualização")
-    json_link = models.URLField(max_length=500, null=True, blank=True)    # Campos de controle temporal
+    capa_pvc = models.BooleanField(default=False)    # Código de operação (ID único do formulário)
+    cod_op = models.CharField(max_length=10, null=True, blank=True)# Campos de controle temporal
     criado_em = models.DateTimeField(default=timezone.now)
     atualizado_em = models.DateTimeField(auto_now=True)
     
