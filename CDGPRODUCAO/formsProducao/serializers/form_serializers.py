@@ -34,7 +34,7 @@ class FormularioBaseSerializer(serializers.ModelSerializer):
     usuario_info = UserBasicInfoSerializer(source='usuario', read_only=True)
     unidades = UnidadeCreateSerializer(many=True, required=False)
     unidades_info = UnidadeSerializer(source='unidades', many=True, read_only=True)
-    arquivos_pdf = ArquivoPDFSerializer(many=True, read_only=True, source='arquivos_pdf')
+    arquivos_pdf = ArquivoPDFSerializer(many=True, read_only=True)
     
     class Meta:
         model = Formulario

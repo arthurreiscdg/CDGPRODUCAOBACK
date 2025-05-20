@@ -214,11 +214,13 @@ class BaseFormularioGoogleDriveService(FormularioService):
             
             desenvolvimento_local = not (existe_arquivo_credenciais or existe_env_credenciais)
             logger.info(f"Modo de desenvolvimento local: {desenvolvimento_local}")
+              # Lista de campos que são apenas do serializador e não devem ser salvos no modelo
+            campos_apenas_serializador = ['arquivos', 'arquivos_nomes', 'cod_op', 'criado_em', 'atualizado_em', 'unidades']
             
             # Atualiza os campos do formulário com os novos dados
             for campo, valor in dados_atualizados.items():
-                # Não atualiza campos somente leitura ou relações especiais
-                if campo not in ['cod_op', 'criado_em', 'atualizado_em', 'unidades']:
+                # Não atualiza campos somente leitura, relações especiais ou campos apenas do serializador
+                if campo not in campos_apenas_serializador:
                     setattr(formulario, campo, valor)
             
             # Atualiza as unidades se necessário

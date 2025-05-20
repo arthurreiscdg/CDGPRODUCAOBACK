@@ -59,10 +59,9 @@ class GoogleDriveService:
             # Detalhar o erro para facilitar o diagnóstico
             import traceback
             logger.error(traceback.format_exc())
-            
     def upload_pdf(self, file_path, file_name, folder_id=None):
         """
-        Faz upload de um arquivo PDF para o Google Drive.
+        Faz upload de um arquivo PDF para o Google Drive e configura as permissões adequadas.
         
         Args:
             file_path (str): Caminho local do arquivo PDF
@@ -71,71 +70,91 @@ class GoogleDriveService:
                                       faz upload para a raiz.
         
         Returns:
-            dict: Informações do arquivo enviado, incluindo o ID e link
+            dict: Informações do arquivo enviado, incluindo ID e links
+        
+        Raises:
+            Exception: Se houver qualquer erro durante o processo de upload
         """
-        try:
+        if not self.service:
+            self.initialize_service()
             if not self.service:
-                self.initialize_service()
-                if not self.service:
-                    logger.error("Não foi possível inicializar o serviço do Google Drive.")
-                    return None
-              # Verifica se o arquivo existe
-            if not os.path.exists(file_path):
-                logger.error(f"Arquivo não encontrado: {file_path}")
-                return None
-            
-            logger.info(f"Iniciando upload do arquivo {file_name} para o Google Drive")
-                
+                raise Exception("Não foi possível inicializar o serviço do Google Drive.")
+        
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Arquivo não encontrado: {file_path}")
+        
+        try:
+            # Preparar metadados do arquivo
             file_metadata = {
                 'name': file_name,
-                'mimeType': 'application/pdf',
+                'mimeType': 'application/pdf'
             }
             
-            # Se um folder_id for fornecido, defina-o como o pai do arquivo
             if folder_id:
                 file_metadata['parents'] = [folder_id]
             
-            # Cria MediaFileUpload para o arquivo
-            media = MediaFileUpload(file_path, mimetype='application/pdf', resumable=True)
-              # Cria o arquivo no Google Drive
+            # Configurar upload
+            media = MediaFileUpload(
+                file_path,
+                mimetype='application/pdf',
+                resumable=True,
+                chunksize=1024*1024  # 1MB por chunk para melhor controle
+            )
+            
+            # Criar arquivo no Drive com todos os campos necessários
             file = self.service.files().create(
                 body=file_metadata,
                 media_body=media,
-                fields='id, webViewLink, webContentLink'
+                fields='id, webViewLink, webContentLink, name, mimeType, size, createdTime, modifiedTime',
+                supportsAllDrives=True
             ).execute()
             
             file_id = file.get('id')
-            logger.info(f"Arquivo {file_name} enviado com sucesso para o Google Drive. ID: {file_id}")
-              # Configura permissões para tornar o arquivo acessível por link
-            self.service.permissions().create(
-                fileId=file_id,
-                body={'type': 'anyone', 'role': 'reader'},
-                fields='id'
-            ).execute()
+            if not file_id:
+                raise Exception("Upload falhou: não foi possível obter o ID do arquivo")
             
-            # Adiciona permissão específica para o email arthur.casadagrafica@gmail.com
-            self.service.permissions().create(
-                fileId=file_id,
-                body={'type': 'user', 'role': 'reader', 'emailAddress': 'arthur.casadagrafica@gmail.com'},
-                fields='id'
-            ).execute()
+            # Configurar permissões
+            permissions = [
+                {'type': 'anyone', 'role': 'reader'},  # Acesso público para leitura
+                {
+                    'type': 'user',
+                    'role': 'writer',
+                    'emailAddress': 'arthur.casadagrafica@gmail.com'
+                }  # Acesso de edição para o email específico
+            ]
             
-            # Obter o link de download direto - formato alternativo caso webContentLink não esteja disponível
-            download_link = file.get('webContentLink')
-            if not download_link:
-                # Criando link de download manualmente no formato esperado pelo Google Drive
-                download_link = f"https://drive.google.com/uc?export=download&id={file_id}"
+            for permission in permissions:
+                self.service.permissions().create(
+                    fileId=file_id,
+                    body=permission,
+                    fields='id',
+                    sendNotificationEmail=False
+                ).execute()
             
-            # Também podemos criar links alternativos para garantir o funcionamento
-            alt_download_link = f"https://drive.google.com/uc?export=download&id={file_id}"
-                
-            logger.info(f"Link de download gerado: {download_link}")
-            logger.info(f"Link alternativo: {alt_download_link}")
-                
+            # Gerar e verificar links
+            web_view_link = file.get('webViewLink')
+            web_content_link = file.get('webContentLink')
+            
+            # Link alternativo de download (mais confiável)
+            download_link = f"https://drive.google.com/uc?export=download&id={file_id}"
+            
+            # Log dos links gerados
+            logger.info(f"Upload do arquivo {file_name} concluído com sucesso")
+            logger.info(f"ID: {file_id}")
+            logger.info(f"View Link: {web_view_link}")
+            logger.info(f"Download Link: {download_link}")
+            
+            # Retornar todas as informações relevantes
             return {
-                'file_id': file_id,
-                'web_link': file.get('webViewLink'),
-                'download_link': alt_download_link  # Usando o formato alternativo que é mais confiável
+                'id': file_id,
+                'name': file.get('name'),
+                'mimeType': file.get('mimeType'),
+                'size': file.get('size'),
+                'createdTime': file.get('createdTime'),
+                'modifiedTime': file.get('modifiedTime'),
+                'webContentLink': web_content_link or download_link,
+                'webViewLink': web_view_link,
+                'downloadLink': download_link
             }
         
         except Exception as e:

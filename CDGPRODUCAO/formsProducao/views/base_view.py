@@ -104,10 +104,18 @@ class BaseFormularioView(APIView):
             
             if not serializer.is_valid():
                 logger.error(f"Erros na validação do serializer: {serializer.errors}")
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            # Dados validados
-            dados_validados = serializer.validated_data
-              # Chama o serviço para processar o formulário e salvar
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)            # Dados validados
+            dados_validados = serializer.validated_data.copy()
+            
+            # Remover campos que são apenas do serializador
+            if 'arquivos' in dados_validados:
+                dados_validados.pop('arquivos')
+            if 'arquivos_nomes' in dados_validados:
+                dados_validados.pop('arquivos_nomes')
+            
+            logger.debug(f"Dados validados após limpeza: {dados_validados}")
+              
+            # Chama o serviço para processar o formulário e salvar
             formulario = self.service_class.processar_formulario(
                 dados_form=dados_validados,
                 arquivos_pdf=arquivos_pdf,
@@ -241,13 +249,23 @@ class BaseFormularioView(APIView):
                         logger.debug(f"Arquivo PDF adicional encontrado: {nome}")
                 
             logger.debug(f"Total de arquivos PDF para atualização: {len(arquivos_pdf)}")
-                
+                  # Dados validados com cópia para evitar modificar o original
+            dados_validados = serializer.validated_data.copy()
+            
+            # Remover campos que são apenas do serializador
+            if 'arquivos' in dados_validados:
+                dados_validados.pop('arquivos')
+            if 'arquivos_nomes' in dados_validados:
+                dados_validados.pop('arquivos_nomes')
+            
+            logger.debug(f"Dados validados para atualização após limpeza: {dados_validados}")
+            
             # Atualiza o formulário
             formulario = self.service_class.atualizar_formulario(
                 formulario,
-                serializer.validated_data,
+                dados_validados,
                 arquivos_pdf if arquivos_pdf else None
-            )            # Retorna os dados atualizados
+            )# Retorna os dados atualizados
             resposta_serializer = self.serializer_class(formulario)
             return Response({
                 "detail": "Formulário atualizado com sucesso",
